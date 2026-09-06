@@ -4,7 +4,8 @@ class PortfolioService {
   // Get all zerodha holdings
   static getZerodhaHoldings(callback) {
     db.all(
-      'SELECT * FROM zerodha_holdings',
+      `SELECT * FROM zerodha_holdings
+       ORDER BY CASE WHEN source = 'manual' THEN 1 ELSE 0 END, id`,
       [],
       (err, rows) => {
         if (err) {

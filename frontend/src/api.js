@@ -115,6 +115,15 @@ export const portfolioAPI = {
     return await apiCall('/portfolio/equity', { method: 'GET' });
   },
 
+  // Import a Zerodha Console holdings statement (.xlsx, base64-encoded)
+  importHoldings: async (fileBase64) => {
+    console.log('📤 Importing holdings statement...');
+    return await apiCall('/portfolio/equity/import', {
+      method: 'POST',
+      body: JSON.stringify({ file: fileBase64 })
+    });
+  },
+
   // Get metals
   getMetals: async () => {
     console.log('🪙 Fetching metals...');
@@ -165,6 +174,30 @@ export const manualAPI = {
     delete: async (id) => {
       console.log('🪙 Deleting metal entry...');
       return await apiCall(`/manual/metals/${id}`, {
+        method: 'DELETE'
+      });
+    }
+  },
+
+  // Manual mutual funds
+  mutualFunds: {
+    create: async (data) => {
+      console.log('📈 Creating manual mutual fund entry...');
+      return await apiCall('/manual/mutual-funds', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    update: async (id, data) => {
+      console.log('📈 Updating manual mutual fund entry...');
+      return await apiCall(`/manual/mutual-funds/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+    delete: async (id) => {
+      console.log('📈 Deleting manual mutual fund entry...');
+      return await apiCall(`/manual/mutual-funds/${id}`, {
         method: 'DELETE'
       });
     }

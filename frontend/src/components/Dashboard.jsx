@@ -40,7 +40,10 @@ export default function Dashboard() {
     try {
       let response;
 
-      if (selectedCategory === 'metals') {
+      if (selectedCategory === 'mutualFund') {
+        // Add manual mutual fund entry
+        response = await manualAPI.mutualFunds.create(formData);
+      } else if (selectedCategory === 'metals') {
         // Add metal
         const metalPayload = {
           ...formData,
@@ -322,7 +325,16 @@ export default function Dashboard() {
               + Add Entry ▼
             </button>
             <div className="dropdown-menu">
-              <button 
+              <button
+                className="dropdown-item"
+                onClick={() => {
+                  setSelectedCategory('mutualFund');
+                  setShowAddModal(true);
+                }}
+              >
+                📈 Mutual Fund
+              </button>
+              <button
                 className="dropdown-item"
                 onClick={() => {
                   setSelectedCategory('metals');

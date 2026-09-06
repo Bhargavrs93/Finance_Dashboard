@@ -269,6 +269,81 @@ class ManualDataService {
     );
   }
 
+  // ============ MANUAL MUTUAL FUNDS ============
+  // Stored in zerodha_holdings (source = 'manual') so they show up alongside
+  // Zerodha-imported mutual funds, without being wiped out by re-imports.
+
+  static createManualMutualFund(data, callback) {
+    console.log('📝 Creating manual mutual fund entry...');
+
+    const quantity = parseFloat(data.quantity) || 0;
+    const average_cost = parseFloat(data.average_cost) || 0;
+    const current_price = parseFloat(data.current_price) || average_cost;
+    const cost_basis = quantity * average_cost;
+    const current_value = quantity * current_price;
+    const gain_loss = current_value - cost_basis;
+    const gain_loss_percent = cost_basis > 0 ? (gain_loss / cost_basis) * 100 : 0;
+
+    db.run(
+      `INSERT INTO zerodha_holdings
+       (tradingsymbol, category, source, quantity, average_cost, cost_basis, current_price, current_value, gain_loss, gain_loss_percent, currency, synced_at)
+       VALUES (?, 'mutual_fund', 'manual', ?, ?, ?, ?, ?, ?, ?, 'INR', ?)`,
+      [data.fund_name, quantity, average_cost, cost_basis, current_price, current_value, gain_loss, gain_loss_percent, new Date().toISOString()],
+      function(err) {
+        if (err) {
+          return callback(err, null);
+        }
+
+        console.log(`✅ Manual mutual fund created with ID: ${this.lastID}`);
+        callback(null, { id: this.lastID, ...data });
+      }
+    );
+  }
+
+  static updateManualMutualFund(id, data, callback) {
+    console.log(`📝 Updating manual mutual fund ID: ${id}`);
+
+    const quantity = parseFloat(data.quantity) || 0;
+    const average_cost = parseFloat(data.average_cost) || 0;
+    const current_price = parseFloat(data.current_price) || average_cost;
+    const cost_basis = quantity * average_cost;
+    const current_value = quantity * current_price;
+    const gain_loss = current_value - cost_basis;
+    const gain_loss_percent = cost_basis > 0 ? (gain_loss / cost_basis) * 100 : 0;
+
+    db.run(
+      `UPDATE zerodha_holdings
+       SET tradingsymbol = ?, quantity = ?, average_cost = ?, cost_basis = ?, current_price = ?, current_value = ?, gain_loss = ?, gain_loss_percent = ?, synced_at = ?
+       WHERE id = ? AND source = 'manual'`,
+      [data.fund_name, quantity, average_cost, cost_basis, current_price, current_value, gain_loss, gain_loss_percent, new Date().toISOString(), id],
+      function(err) {
+        if (err) {
+          return callback(err, null);
+        }
+
+        console.log(`✅ Manual mutual fund updated: ID ${id}`);
+        callback(null, { id, ...data });
+      }
+    );
+  }
+
+  static deleteManualMutualFund(id, callback) {
+    console.log(`🗑️  Deleting manual mutual fund ID: ${id}`);
+
+    db.run(
+      "DELETE FROM zerodha_holdings WHERE id = ? AND source = 'manual'",
+      [id],
+      function(err) {
+        if (err) {
+          return callback(err, null);
+        }
+
+        console.log(`✅ Manual mutual fund deleted: ID ${id}`);
+        callback(null, { success: true, id });
+      }
+    );
+  }
+
   // ============ RETIREMENTS ============
 
   // Create retirement account

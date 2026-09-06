@@ -19,6 +19,7 @@ const AuthService = require('./authService');
 const { verifyToken } = require('./authMiddleware');
 const PortfolioService = require('./portfolioService');
 const ManualDataService = require('./manualDataService');
+const ZerodhaImportService = require('./zerodhaImportService');
 
 // Start cron job for daily sync
 CronService.startDailySyncJob();
@@ -28,7 +29,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 console.log('🔧 Middleware configured');
 
@@ -181,6 +182,10 @@ app.get('/api/portfolio/equity', verifyToken, (req, res) => {
     const stocks = holdings.filter(h => h.category === 'stock' || !h.category);
     const mutualFunds = holdings.filter(h => h.category === 'mutual_fund');
 
+    const totalValue = holdings.reduce((sum, h) => sum + parseFloat(h.current_value || 0), 0);
+    const totalInvested = holdings.reduce((sum, h) => sum + parseFloat(h.cost_basis || 0), 0);
+    const gainLoss = totalValue - totalInvested;
+
     console.log(`✅ Equity retrieved: ${stocks.length} stocks, ${mutualFunds.length} MFs`);
     res.json({
       success: true,
@@ -191,10 +196,37 @@ app.get('/api/portfolio/equity', verifyToken, (req, res) => {
         summary: {
           totalStocks: stocks.length,
           totalMFs: mutualFunds.length,
-          totalValue: holdings.reduce((sum, h) => sum + parseFloat(h.current_value || 0), 0),
-          totalInvested: holdings.reduce((sum, h) => sum + parseFloat(h.cost_basis || 0), 0)
+          totalValue,
+          totalInvested,
+          gainLoss,
+          gainLossPercent: totalInvested > 0 ? (gainLoss / totalInvested) * 100 : 0
         }
       }
+    });
+  });
+});
+
+app.post('/api/portfolio/equity/import', verifyToken, (req, res) => {
+  console.log('📍 POST /api/portfolio/equity/import called');
+  const { file } = req.body;
+
+  if (!file) {
+    return res.status(400).json({ success: false, message: 'File is required' });
+  }
+
+  ZerodhaImportService.importHoldingsWorkbook(file, (err, result) => {
+    if (err) {
+      console.error('❌ Error importing holdings:', err.message);
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'Error importing holdings'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Imported ${result.stocksImported} stock(s) and ${result.mfImported} mutual fund(s)`,
+      ...result
     });
   });
 });
@@ -407,6 +439,64 @@ app.delete('/api/manual/metals/:id', verifyToken, (req, res) => {
     }
 
     console.log('✅ Metal deleted');
+    res.json({ success: true, data: result });
+  });
+});
+
+// -------- MANUAL MUTUAL FUNDS --------
+
+app.post('/api/manual/mutual-funds', verifyToken, (req, res) => {
+  console.log('📍 POST /api/manual/mutual-funds called');
+
+  ManualDataService.createManualMutualFund(req.body, (err, fund) => {
+    if (err) {
+      console.error('❌ Error creating manual mutual fund:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Error creating manual mutual fund',
+        error: err.message
+      });
+    }
+
+    console.log('✅ Manual mutual fund created');
+    res.status(201).json({ success: true, data: fund });
+  });
+});
+
+app.put('/api/manual/mutual-funds/:id', verifyToken, (req, res) => {
+  console.log('📍 PUT /api/manual/mutual-funds/:id called');
+  const { id } = req.params;
+
+  ManualDataService.updateManualMutualFund(id, req.body, (err, fund) => {
+    if (err) {
+      console.error('❌ Error updating manual mutual fund:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Error updating manual mutual fund',
+        error: err.message
+      });
+    }
+
+    console.log('✅ Manual mutual fund updated');
+    res.json({ success: true, data: fund });
+  });
+});
+
+app.delete('/api/manual/mutual-funds/:id', verifyToken, (req, res) => {
+  console.log('📍 DELETE /api/manual/mutual-funds/:id called');
+  const { id } = req.params;
+
+  ManualDataService.deleteManualMutualFund(id, (err, result) => {
+    if (err) {
+      console.error('❌ Error deleting manual mutual fund:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Error deleting manual mutual fund',
+        error: err.message
+      });
+    }
+
+    console.log('✅ Manual mutual fund deleted');
     res.json({ success: true, data: result });
   });
 });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { portfolioAPI, manualAPI } from '../api';
+import AddEntryModal from './AddEntryModal';
 import '../styles/DetailPage.css';
 
 export default function DetailPage() {
@@ -9,6 +10,8 @@ export default function DetailPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [importingHoldings, setImportingHoldings] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Fetch category data on load
   useEffect(() => {
@@ -70,6 +73,45 @@ export default function DetailPage() {
     return '₹' + value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
   };
 
+  // Add a manual metal entry (current price is filled in automatically from the live gold price)
+  const handleAddMetal = async (formData) => {
+    try {
+      const response = await manualAPI.metals.create({ ...formData, metal_type: 'gold' });
+      if (response.success) {
+        alert('✅ Entry added successfully!');
+        setShowAddModal(false);
+        fetchCategoryData();
+      } else {
+        alert(`❌ Error: ${response.message || 'Error adding entry'}`);
+      }
+    } catch (err) {
+      alert('❌ Error adding entry: ' + err.message);
+    }
+  };
+
+  // Read the uploaded Zerodha holdings statement (.xlsx) and send it to the backend as base64
+  const handleHoldingsFileChange = (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      setImportingHoldings(true);
+      try {
+        const base64 = event.target.result.split(',')[1];
+        const response = await portfolioAPI.importHoldings(base64);
+        alert(`✅ ${response.message}`);
+        fetchCategoryData();
+      } catch (err) {
+        alert(`❌ Import failed: ${err.message}`);
+      } finally {
+        setImportingHoldings(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   if (loading) {
     return (
       <div className="detail-page">
@@ -121,7 +163,7 @@ export default function DetailPage() {
   };
 
   const renderEquity = () => {
-    const { holdings = [], summary = {} } = data;
+    const { stocks = [], mutualFunds = [], summary = {} } = data;
     return (
       <>
         <div className="summary-section">
@@ -136,47 +178,104 @@ export default function DetailPage() {
               <strong>{formatCurrency(summary.totalInvested)}</strong>
             </div>
             <div className="summary-item">
-              <span>Total Stocks:</span>
-              <strong>{summary.totalStocks || 0}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Total MFs:</span>
-              <strong>{summary.totalMFs || 0}</strong>
+              <span>% Returns:</span>
+              <strong className={summary.gainLossPercent >= 0 ? 'positive' : 'negative'}>
+                {summary.gainLossPercent?.toFixed(2)}%
+              </strong>
             </div>
           </div>
         </div>
 
+        <div className="import-section">
+          <div className="import-card">
+            <div>
+              <h4>📥 Import Holdings</h4>
+              <p>Zerodha Console → download the Holdings Statement (.xlsx). It has separate Equity and Mutual Funds tabs — both get imported automatically.</p>
+            </div>
+            <label className={`import-btn ${importingHoldings ? 'disabled' : ''}`}>
+              {importingHoldings ? 'Importing…' : '📤 Import Holdings Statement (.xlsx)'}
+              <input type="file" accept=".xlsx,.xls" onChange={handleHoldingsFileChange} disabled={importingHoldings} hidden />
+            </label>
+          </div>
+        </div>
+
         <div className="holdings-section">
-          <h3>All Holdings</h3>
-          {holdings.length > 0 ? (
+          <h3>Stocks ({stocks.length})</h3>
+          {stocks.length > 0 ? (
             <table className="holdings-table">
               <thead>
                 <tr>
                   <th>Symbol</th>
-                  <th>Name</th>
                   <th>Quantity</th>
-                  <th>Cost Basis</th>
+                  <th>Avg Cost</th>
+                  <th>Prev. Close</th>
+                  <th>Invested</th>
                   <th>Current Value</th>
                   <th>Gain/Loss</th>
+                  <th>Gain/Loss %</th>
                 </tr>
               </thead>
               <tbody>
-                {holdings.map((holding, idx) => (
+                {stocks.map((holding, idx) => (
                   <tr key={idx}>
-                    <td>{holding.symbol || 'N/A'}</td>
-                    <td>{holding.instrument_name || 'N/A'}</td>
+                    <td>{holding.tradingsymbol}</td>
                     <td>{holding.quantity}</td>
+                    <td>{formatCurrency(holding.average_cost)}</td>
+                    <td>{formatCurrency(holding.current_price)}</td>
                     <td>{formatCurrency(holding.cost_basis)}</td>
                     <td>{formatCurrency(holding.current_value)}</td>
                     <td className={holding.gain_loss >= 0 ? 'positive' : 'negative'}>
                       {formatCurrency(holding.gain_loss)}
+                    </td>
+                    <td className={holding.gain_loss_percent >= 0 ? 'positive' : 'negative'}>
+                      {holding.gain_loss_percent?.toFixed(2)}%
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p>No equity holdings found</p>
+            <p>No stock holdings found. Import a holdings statement to get started.</p>
+          )}
+        </div>
+
+        <div className="holdings-section">
+          <h3>Mutual Funds ({mutualFunds.length})</h3>
+          {mutualFunds.length > 0 ? (
+            <table className="holdings-table">
+              <thead>
+                <tr>
+                  <th>Fund</th>
+                  <th>Units</th>
+                  <th>Avg NAV</th>
+                  <th>Prev. Close</th>
+                  <th>Invested</th>
+                  <th>Current Value</th>
+                  <th>Gain/Loss</th>
+                  <th>Gain/Loss %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mutualFunds.map((holding, idx) => (
+                  <tr key={idx}>
+                    <td>{holding.tradingsymbol}</td>
+                    <td>{holding.quantity?.toFixed(3)}</td>
+                    <td>{formatCurrency(holding.average_cost)}</td>
+                    <td>{formatCurrency(holding.current_price)}</td>
+                    <td>{formatCurrency(holding.cost_basis)}</td>
+                    <td>{formatCurrency(holding.current_value)}</td>
+                    <td className={holding.gain_loss >= 0 ? 'positive' : 'negative'}>
+                      {formatCurrency(holding.gain_loss)}
+                    </td>
+                    <td className={holding.gain_loss_percent >= 0 ? 'positive' : 'negative'}>
+                      {holding.gain_loss_percent?.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>No mutual fund holdings found. Import a holdings statement to get started.</p>
           )}
         </div>
       </>
@@ -208,7 +307,12 @@ export default function DetailPage() {
         </div>
 
         <div className="holdings-section">
-          <h3>Metal Holdings</h3>
+          <div className="holdings-section-header">
+            <h3>Metal Holdings</h3>
+            <button className="add-entry-btn" onClick={() => setShowAddModal(true)} type="button">
+              + Add Entry
+            </button>
+          </div>
           {holdings.length > 0 ? (
             <table className="holdings-table">
               <thead>
@@ -436,6 +540,14 @@ export default function DetailPage() {
       <div className="detail-content">
         {renderContent()}
       </div>
+
+      {/* Add Entry Modal */}
+      <AddEntryModal
+        isOpen={showAddModal}
+        category="metals"
+        onClose={() => setShowAddModal(false)}
+        onSubmit={handleAddMetal}
+      />
     </div>
   );
 }

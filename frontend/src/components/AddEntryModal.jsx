@@ -6,6 +6,12 @@ const AddEntryModal = ({ isOpen, category, onClose, onSubmit }) => {
 
   const getFieldsForCategory = () => {
     const fields = {
+      mutualFund: [
+        { name: 'fund_name', label: 'Fund Name', type: 'text', required: true },
+        { name: 'quantity', label: 'Units', type: 'number', required: true },
+        { name: 'average_cost', label: 'Purchase NAV (₹)', type: 'number', required: true },
+        { name: 'current_price', label: 'Current NAV (₹) - Optional', type: 'number', required: false }
+      ],
       metals: [
         { name: 'purity', label: 'Purity (24k/22k)', type: 'text', required: true },
         { name: 'purchase_date', label: 'Date of Purchase', type: 'date', required: false },
@@ -61,7 +67,7 @@ const AddEntryModal = ({ isOpen, category, onClose, onSubmit }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Add {category.charAt(0).toUpperCase() + category.slice(1)} Entry</h2>
+          <h2>Add {category === 'mutualFund' ? 'Mutual Fund' : category.charAt(0).toUpperCase() + category.slice(1)} Entry</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 

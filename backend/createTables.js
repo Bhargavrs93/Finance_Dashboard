@@ -20,6 +20,7 @@ const createTablesSQL = [
     tradingsymbol VARCHAR(50) UNIQUE NOT NULL,
     instrument_token INTEGER,
     category VARCHAR(20),
+    source VARCHAR(20) DEFAULT 'zerodha',
     quantity DECIMAL(10, 2) NOT NULL,
     average_cost DECIMAL(10, 2),
     cost_basis DECIMAL(12, 2),
