@@ -2,9 +2,11 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { CurrencyProvider } from './CurrencyContext.jsx';
+import { PrivacyProvider } from './PrivacyContext.jsx';
 import LoginPage from './components/LoginPage.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import DetailPage from './components/DetailPage.jsx';
+import CompoundCalculator from './components/CompoundCalculator.jsx';
 
 function AppContent() {
   const { isAuthenticated, loading } = useAuth();
@@ -25,12 +27,15 @@ function AppContent() {
 
   return isAuthenticated ? (
     <CurrencyProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/details/:category" element={<DetailPage />} />
-        </Routes>
-      </Router>
+      <PrivacyProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/details/:category" element={<DetailPage />} />
+            <Route path="/calculator" element={<CompoundCalculator />} />
+          </Routes>
+        </Router>
+      </PrivacyProvider>
     </CurrencyProvider>
   ) : (
     <LoginPage />

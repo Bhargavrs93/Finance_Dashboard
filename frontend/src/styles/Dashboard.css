@@ -78,6 +78,23 @@
   font-weight: 500;
 }
 
+.privacy-toggle-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.privacy-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: white;
+}
+
 .logout-btn {
   background: rgba(255, 255, 255, 0.2);
   color: white;
@@ -124,6 +141,16 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: all 0.2s;
+}
+
+.fi-card.clickable {
+  cursor: pointer;
+}
+
+.fi-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .fi-label,
@@ -388,21 +415,59 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
+.account-main {
+  flex: 1;
+  min-width: 200px;
+  margin-right: 20px;
+}
+
+.account-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .account-name {
   margin: 0;
   font-weight: 600;
   color: #333;
 }
 
+.account-badge {
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .account-desc {
-  margin: 2px 0 0 0;
+  margin: 2px 0 8px 0;
   font-size: 0.85rem;
   color: #888;
 }
 
-.account-item strong {
+.account-progress-bar {
+  max-width: 300px;
+}
+
+.account-value-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.account-value-col strong {
   font-size: 1.1rem;
   color: #333;
+}
+
+.account-percent {
+  font-size: 0.75rem;
+  color: #999;
 }
 
 .progress-bar {
@@ -488,6 +553,13 @@
   cursor: pointer;
   font-weight: 500;
   margin-top: 20px;
+}
+
+.dashboard-error .logout-link-btn {
+  background: none;
+  color: #667eea;
+  border: 1px solid #667eea;
+  margin-left: 10px;
 }
 
 /* Responsive */

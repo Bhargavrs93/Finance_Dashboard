@@ -364,6 +364,15 @@ app.get('/api/exchange-rates', verifyToken, async (req, res) => {
   }
 });
 
+app.post('/api/auth/verify-privacy-pin', verifyToken, (req, res) => {
+  console.log('📍 POST /api/auth/verify-privacy-pin called');
+  const { pin } = req.body;
+  const correctPin = process.env.PRIVACY_PIN || '';
+
+  const valid = !!pin && !!correctPin && pin === correctPin;
+  res.json({ success: valid, message: valid ? 'PIN verified' : 'Incorrect PIN' });
+});
+
 app.get('/api/portfolio/retirement', verifyToken, (req, res) => {
   console.log('📍 GET /api/portfolio/retirement called (with live prices where applicable)');
 

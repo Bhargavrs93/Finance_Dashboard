@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { useCurrency } from '../CurrencyContext.jsx';
+import { usePrivacy } from '../PrivacyContext.jsx';
 import { portfolioAPI, manualAPI } from '../api.js';
 import '../styles/Dashboard.css';
 import AddEntryModal from './AddEntryModal.jsx';
 import DonutChart from './DonutChart.jsx';
+import UnmaskModal from './UnmaskModal.jsx';
 
 const CATEGORY_META = {
   equity: { label: 'Equity', color: '#667eea' },
   metals: { label: 'Metals', color: '#f5576c' },
   global: { label: 'Global', color: '#00f2fe' },
-  debt: { label: 'Debt / Cash', color: '#38f9d7' }
+  debt: { label: 'Debt / Cash', color: '#38f9d7' },
+  retirement: { label: 'Retirement', color: '#9b59b6' }
 };
 
 const CURRENCY_META = {
@@ -23,10 +26,12 @@ const CURRENCY_META = {
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const { currency, setCurrency, convertAmount } = useCurrency();
+  const { masked, mask, unmask } = usePrivacy();
   const navigate = useNavigate();
   const [portfolioData, setPortfolioData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showUnmaskModal, setShowUnmaskModal] = useState(false);
 
   const [goals, setGoals] = useState([]);
   const [showGoalModal, setShowGoalModal] = useState(false);
@@ -114,13 +119,20 @@ export default function Dashboard() {
 
   // Format currency - the backend reports everything in INR, so convert to
   // the toggled currency (using live rates) before formatting, rather than
-  // just swapping the symbol on the same underlying number.
+  // just swapping the symbol on the same underlying number. Whole numbers
+  // only (no decimals) - percentages are formatted separately and unaffected.
+  // When masked, returns a placeholder instead of the real amount.
   const formatCurrency = (value) => {
+    const symbol = currency === 'AUD' ? 'A$' : '₹';
+    if (masked) return symbol + '••••••';
+
     const converted = convertAmount(value || 0, 'INR', currency);
-    if (currency === 'AUD') {
-      return 'A$' + converted.toLocaleString('en-AU', { maximumFractionDigits: 2 });
-    }
-    return '₹' + converted.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+    const locale = currency === 'AUD' ? 'en-AU' : 'en-IN';
+    return symbol + Math.round(converted).toLocaleString(locale, { maximumFractionDigits: 0 });
+  };
+
+  const scrollToAccounts = () => {
+    document.getElementById('accounts-section')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   if (loading) {
@@ -137,6 +149,7 @@ export default function Dashboard() {
         <h2>Error loading portfolio</h2>
         <p>{error}</p>
         <button onClick={fetchPortfolioData}>Retry</button>
+        <button onClick={logout} className="logout-link-btn">Log out</button>
       </div>
     );
   }
@@ -159,13 +172,26 @@ export default function Dashboard() {
     color: CURRENCY_META[item.currency]?.color || '#ccc'
   }));
 
+  // Percent shown per account reflects its share of Liquid portfolio
+  // allocation only (matching the donut chart above) - Retirement is
+  // illiquid/locked and excluded from that allocation, so it gets no percent.
   const accounts = [
-    { name: 'Zerodha (IN)', description: 'Equities, mutual funds', value: breakdown.equity.value, route: '/details/equity' },
-    { name: 'Vanguard (AU)', description: 'VDHG, diversified ETFs', value: breakdown.global.value, route: '/details/global' },
-    { name: 'Debt / Cash holdings', description: 'FDs, cash deposits', value: breakdown.debt.value, route: '/details/debt' },
-    { name: 'Precious metals', description: 'Gold, silver holdings', value: breakdown.metals.value, route: '/details/metals' },
-    { name: 'Retirement (locked)', description: 'Super, PPF, physical gold', value: breakdown.retirement.value, route: '/details/retirement' }
-  ];
+    { name: 'Zerodha (IN)', description: 'Equities, mutual funds', value: breakdown.equity.value, route: '/details/equity', category: 'equity' },
+    { name: 'Vanguard (AU)', description: 'VDHG, diversified ETFs', value: breakdown.global.value, route: '/details/global', category: 'global' },
+    { name: 'Debt / Cash holdings', description: 'FDs, cash deposits', value: breakdown.debt.value, route: '/details/debt', category: 'debt' },
+    { name: 'Precious metals', description: 'Gold, silver holdings', value: breakdown.metals.value, route: '/details/metals', category: 'metals' }
+  ].map(acc => ({
+    ...acc,
+    percent: fi.investableAssets > 0 ? (acc.value / fi.investableAssets) * 100 : 0
+  }));
+
+  const retirementAccount = {
+    name: 'Retirement (locked)',
+    description: 'Super, PPF, physical gold',
+    value: breakdown.retirement.value,
+    route: '/details/retirement',
+    category: 'retirement'
+  };
 
   return (
     <div className="dashboard">
@@ -193,6 +219,15 @@ export default function Dashboard() {
             </button>
           </div>
 
+          {/* Privacy Toggle */}
+          <button
+            className="privacy-toggle-btn"
+            onClick={() => (masked ? setShowUnmaskModal(true) : mask())}
+            type="button"
+          >
+            {masked ? '🔒 Masked' : '🔓 Unmasked'}
+          </button>
+
           {/* User Menu */}
           <div className="user-menu">
             <span className="username">👤 {user?.username}</span>
@@ -207,7 +242,7 @@ export default function Dashboard() {
       <section className="fi-section">
         <h2>Financial Independence progress</h2>
         <div className="fi-cards">
-          <div className="fi-card">
+          <div className="fi-card clickable" onClick={scrollToAccounts} title="View accounts breakdown">
             <span className="fi-label">Investable Assets</span>
             <strong className="fi-value blue">{formatCurrency(fi.investableAssets)}</strong>
             <span className="fi-note">Liquid + active</span>
@@ -215,7 +250,6 @@ export default function Dashboard() {
           <div className="fi-card">
             <span className="fi-label">FI Target ({fi.fiTarget ? '25x' : '—'})</span>
             <strong className="fi-value">{formatCurrency(fi.fiTarget)}</strong>
-            <span className="fi-note">Annual expenses × 25</span>
           </div>
           <div className="fi-card">
             <span className="fi-label">Progress</span>
@@ -312,18 +346,59 @@ export default function Dashboard() {
       </section>
 
       {/* Accounts */}
-      <section className="accounts-section">
+      <section className="accounts-section" id="accounts-section">
         <h2>Accounts</h2>
         <div className="account-list">
           {accounts.map(acc => (
             <div className="account-item clickable" onClick={() => navigate(acc.route)} key={acc.name}>
-              <div>
-                <p className="account-name">{acc.name}</p>
+              <div className="account-main">
+                <div className="account-name-row">
+                  <p className="account-name">{acc.name}</p>
+                  <span
+                    className="account-badge"
+                    style={{ background: CATEGORY_META[acc.category]?.color }}
+                  >
+                    {CATEGORY_META[acc.category]?.label}
+                  </span>
+                </div>
                 <p className="account-desc">{acc.description}</p>
+                <div className="progress-bar account-progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${Math.min(acc.percent, 100)}%`,
+                      background: CATEGORY_META[acc.category]?.color
+                    }}
+                  ></div>
+                </div>
               </div>
-              <strong>{formatCurrency(acc.value)}</strong>
+              <div className="account-value-col">
+                <strong>{formatCurrency(acc.value)}</strong>
+                <span className="account-percent">{acc.percent.toFixed(0)}% of liquid assets</span>
+              </div>
             </div>
           ))}
+
+          {/* Retirement is illiquid/locked - shown separately, without a
+              percent-of-liquid-allocation bar since it isn't part of that pool */}
+          <div className="account-item clickable" onClick={() => navigate(retirementAccount.route)}>
+            <div className="account-main">
+              <div className="account-name-row">
+                <p className="account-name">{retirementAccount.name}</p>
+                <span
+                  className="account-badge"
+                  style={{ background: CATEGORY_META[retirementAccount.category]?.color }}
+                >
+                  {CATEGORY_META[retirementAccount.category]?.label}
+                </span>
+              </div>
+              <p className="account-desc">{retirementAccount.description}</p>
+            </div>
+            <div className="account-value-col">
+              <strong>{formatCurrency(retirementAccount.value)}</strong>
+              <span className="account-percent">Locked</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -332,6 +407,9 @@ export default function Dashboard() {
         <div className="footer-buttons">
           <button onClick={fetchPortfolioData} className="refresh-btn">
             🔄 Refresh Data
+          </button>
+          <button onClick={() => navigate('/calculator')} className="refresh-btn">
+            🧮 Compound Calculator
           </button>
         </div>
 
@@ -347,6 +425,13 @@ export default function Dashboard() {
         initialData={editingGoal}
         onClose={() => { setShowGoalModal(false); setEditingGoal(null); }}
         onSubmit={handleGoalSubmit}
+      />
+
+      {/* Unmask PIN Modal */}
+      <UnmaskModal
+        isOpen={showUnmaskModal}
+        onClose={() => setShowUnmaskModal(false)}
+        onUnmask={unmask}
       />
     </div>
   );

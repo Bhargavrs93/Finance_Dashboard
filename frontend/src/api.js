@@ -40,6 +40,15 @@ const apiCall = async (endpoint, options = {}) => {
     headers
   });
 
+  // The stored token is invalid/expired (e.g. the server's JWT secret
+  // changed, or it naturally expired). Rather than leaving the user stuck
+  // on a dead-end error screen, clear it and bounce back to the login page.
+  if (response.status === 401) {
+    removeToken();
+    window.location.reload();
+    throw new Error('Session expired - redirecting to login...');
+  }
+
   const data = await response.json();
 
   if (!response.ok) {
@@ -97,7 +106,15 @@ export const authAPI = {
   },
 
   // Get current token
-  getToken: getToken
+  getToken: getToken,
+
+  // Verify the privacy PIN used to unmask portfolio values
+  verifyPrivacyPin: async (pin) => {
+    return await apiCall('/auth/verify-privacy-pin', {
+      method: 'POST',
+      body: JSON.stringify({ pin })
+    });
+  }
 };
 
 // ============ PORTFOLIO ============

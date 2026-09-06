@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { portfolioAPI, manualAPI } from '../api';
 import { useCurrency } from '../CurrencyContext.jsx';
+import { usePrivacy } from '../PrivacyContext.jsx';
+import { useAuth } from '../AuthContext.jsx';
 import AddEntryModal from './AddEntryModal';
 import '../styles/DetailPage.css';
 
@@ -9,6 +11,8 @@ export default function DetailPage() {
   const { category } = useParams();
   const navigate = useNavigate();
   const { currency, convertAmount, rates } = useCurrency();
+  const { masked } = usePrivacy();
+  const { logout } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -72,14 +76,16 @@ export default function DetailPage() {
   };
 
   // Format currency - shows the right symbol for the entry's own currency
-  // (₹ for INR, A$ for AUD, $ for USD), rather than always assuming INR
+  // (₹ for INR, A$ for AUD, $ for USD), rather than always assuming INR.
+  // Whole numbers only (no decimals). When masked, returns a placeholder.
   const formatCurrency = (value, currency = 'INR') => {
     if (!value) value = 0;
     const symbols = { INR: '₹', AUD: 'A$', USD: '$' };
     const locales = { INR: 'en-IN', AUD: 'en-AU', USD: 'en-US' };
     const symbol = symbols[currency] || '₹';
     const locale = locales[currency] || 'en-IN';
-    return symbol + value.toLocaleString(locale, { maximumFractionDigits: 2 });
+    if (masked) return symbol + '••••••';
+    return symbol + Math.round(value).toLocaleString(locale, { maximumFractionDigits: 0 });
   };
 
   // Open the modal to add a new entry. 'mode' picks a field-set variant for
@@ -188,6 +194,7 @@ export default function DetailPage() {
           <h2>Error loading {category}</h2>
           <p>{error}</p>
           <button onClick={fetchCategoryData}>Retry</button>
+          <button onClick={logout} className="logout-link-btn">Log out</button>
         </div>
       </div>
     );
