@@ -74,7 +74,9 @@ export default function Dashboard() {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
   });
 
   // Format currency
