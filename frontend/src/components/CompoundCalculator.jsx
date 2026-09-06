@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import DonutChart from './DonutChart.jsx';
 import '../styles/CompoundCalculator.css';
 
-const formatCurrency = (value) => '₹' + Math.round(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-
 // Lumpsum: standard compound interest, compounded annually
 function calculateLumpsum(principal, annualRatePercent, years) {
   const rate = annualRatePercent / 100;
@@ -30,9 +28,16 @@ function calculateSIP(monthlyInvestment, annualRatePercent, years) {
 export default function CompoundCalculator() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('sip'); // 'sip' or 'lumpsum'
+  const [currency, setCurrency] = useState('INR'); // 'INR' or 'AUD' - purely a display choice, not a live conversion
   const [amount, setAmount] = useState(10000);
   const [rate, setRate] = useState(12);
   const [years, setYears] = useState(10);
+
+  const formatCurrency = (value) => {
+    const symbol = currency === 'AUD' ? '$' : '₹';
+    const locale = currency === 'AUD' ? 'en-AU' : 'en-IN';
+    return symbol + Math.round(value || 0).toLocaleString(locale, { maximumFractionDigits: 0 });
+  };
 
   const result = useMemo(() => {
     const { invested, maturity } = mode === 'sip'
@@ -85,19 +90,36 @@ export default function CompoundCalculator() {
         <p>See how your investments could grow over time</p>
       </header>
 
-      <div className="calc-mode-toggle">
-        <button
-          className={mode === 'sip' ? 'active' : ''}
-          onClick={() => setMode('sip')}
-        >
-          Monthly SIP
-        </button>
-        <button
-          className={mode === 'lumpsum' ? 'active' : ''}
-          onClick={() => setMode('lumpsum')}
-        >
-          Lumpsum
-        </button>
+      <div className="calc-toggle-row">
+        <div className="calc-mode-toggle">
+          <button
+            className={mode === 'sip' ? 'active' : ''}
+            onClick={() => setMode('sip')}
+          >
+            Monthly SIP
+          </button>
+          <button
+            className={mode === 'lumpsum' ? 'active' : ''}
+            onClick={() => setMode('lumpsum')}
+          >
+            Lumpsum
+          </button>
+        </div>
+
+        <div className="calc-mode-toggle">
+          <button
+            className={currency === 'INR' ? 'active' : ''}
+            onClick={() => setCurrency('INR')}
+          >
+            ₹ INR
+          </button>
+          <button
+            className={currency === 'AUD' ? 'active' : ''}
+            onClick={() => setCurrency('AUD')}
+          >
+            $ AUD
+          </button>
+        </div>
       </div>
 
       <div className="calc-body">

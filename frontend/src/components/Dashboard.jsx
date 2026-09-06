@@ -240,7 +240,7 @@ export default function Dashboard() {
 
       {/* Financial Independence Progress */}
       <section className="fi-section">
-        <h2>Financial Independence progress</h2>
+        <h2>Digital Pocket</h2>
         <div className="fi-cards">
           <div className="fi-card clickable" onClick={scrollToAccounts} title="View accounts breakdown">
             <span className="fi-label">Investable Assets</span>
@@ -250,6 +250,7 @@ export default function Dashboard() {
           <div className="fi-card">
             <span className="fi-label">FI Target ({fi.fiTarget ? '25x' : '—'})</span>
             <strong className="fi-value">{formatCurrency(fi.fiTarget)}</strong>
+            <span className="fi-note">Financial Independence</span>
           </div>
           <div className="fi-card">
             <span className="fi-label">Progress</span>
@@ -270,20 +271,14 @@ export default function Dashboard() {
       <section className="waterfall-section">
         <h2>Total net worth waterfall</h2>
         <div className="waterfall-cards">
-          <div className="waterfall-card">
+          <div
+            className="waterfall-card clickable"
+            onClick={() => navigate('/details/retirement')}
+            title="View Retirement Accounts"
+          >
             <span className="waterfall-label">Illiquid &amp; locked</span>
             <strong>{formatCurrency(fi.illiquidLocked)}</strong>
             <span className="waterfall-note">Super, PF, physical gold</span>
-          </div>
-          <div className="waterfall-card">
-            <span className="waterfall-label">Semi-liquid</span>
-            <strong className="neutral">{formatCurrency(fi.semiLiquid)}</strong>
-            <span className="waterfall-note">Property, long-term holds</span>
-          </div>
-          <div className="waterfall-card">
-            <span className="waterfall-label">Liquid investments</span>
-            <strong className="positive">{formatCurrency(fi.investableAssets)}</strong>
-            <span className="waterfall-note">Active portfolio</span>
           </div>
         </div>
         <div className="networth-banner">

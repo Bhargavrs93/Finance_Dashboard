@@ -45,10 +45,18 @@
   opacity: 0.9;
 }
 
+.calc-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
 .calc-mode-toggle {
   display: flex;
   gap: 8px;
-  margin-bottom: 24px;
   background: white;
   padding: 6px;
   border-radius: 10px;
