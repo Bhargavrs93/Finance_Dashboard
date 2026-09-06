@@ -1,5 +1,8 @@
 const db = require('./database');
 
+// Round to 2 decimal places to avoid floating-point artifacts (e.g. 12 * 75.39 = 904.6800000000001)
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 class ManualDataService {
   // ============ METALS ============
 
@@ -17,11 +20,11 @@ class ManualDataService {
         data.location || 'physical',
         data.quantity || 0,
         data.cost_per_unit || 0,
-        data.cost_basis || (data.quantity * data.cost_per_unit),
+        round2(data.cost_basis || (data.quantity * data.cost_per_unit)),
         data.purchase_date || new Date().toISOString().split('T')[0],
         data.current_price || data.cost_per_unit || 0,
-        data.current_value || (data.quantity * (data.current_price || data.cost_per_unit || 0)),
-        data.gain_loss || ((data.quantity * (data.current_price || data.cost_per_unit || 0)) - data.cost_basis),
+        round2(data.current_value || (data.quantity * (data.current_price || data.cost_per_unit || 0))),
+        round2(data.gain_loss || ((data.quantity * (data.current_price || data.cost_per_unit || 0)) - data.cost_basis)),
         data.gain_loss_percent || 0,
         data.notes || '',
         new Date().toISOString()
@@ -42,13 +45,13 @@ class ManualDataService {
     console.log(`📝 Updating metal ID: ${id}`);
 
     // Calculate derived fields
-    const cost_basis = data.quantity * data.cost_per_unit;
-    const current_value = data.quantity * data.current_price;
-    const gain_loss = current_value - cost_basis;
-    const gain_loss_percent = cost_basis > 0 ? (gain_loss / cost_basis) * 100 : 0;
+    const cost_basis = round2(data.quantity * data.cost_per_unit);
+    const current_value = round2(data.quantity * data.current_price);
+    const gain_loss = round2(current_value - cost_basis);
+    const gain_loss_percent = cost_basis > 0 ? round2((gain_loss / cost_basis) * 100) : 0;
 
     db.run(
-      `UPDATE metals 
+      `UPDATE metals
        SET quantity = ?, cost_per_unit = ?, cost_basis = ?, current_price = ?, current_value = ?, gain_loss = ?, gain_loss_percent = ?, notes = ?, last_updated = ? 
        WHERE id = ?`,
       [
@@ -108,10 +111,10 @@ class ManualDataService {
         data.name || '',
         data.quantity || 0,
         data.cost_per_unit || 0,
-        data.cost_basis || (data.quantity * data.cost_per_unit),
+        round2(data.cost_basis || (data.quantity * data.cost_per_unit)),
         data.purchase_date || new Date().toISOString().split('T')[0],
         data.current_price || data.cost_per_unit || 0,
-        data.current_value || (data.quantity * (data.current_price || data.cost_per_unit || 0)),
+        round2(data.current_value || (data.quantity * (data.current_price || data.cost_per_unit || 0))),
         data.gain_loss || 0,
         data.gain_loss_percent || 0,
         data.currency || 'AUD',
@@ -133,13 +136,13 @@ class ManualDataService {
   static updateGlobalAsset(id, data, callback) {
     console.log(`📝 Updating global asset ID: ${id}`);
 
-    const cost_basis = data.quantity * data.cost_per_unit;
-    const current_value = data.quantity * data.current_price;
-    const gain_loss = current_value - cost_basis;
-    const gain_loss_percent = cost_basis > 0 ? (gain_loss / cost_basis) * 100 : 0;
+    const cost_basis = round2(data.quantity * data.cost_per_unit);
+    const current_value = round2(data.quantity * data.current_price);
+    const gain_loss = round2(current_value - cost_basis);
+    const gain_loss_percent = cost_basis > 0 ? round2((gain_loss / cost_basis) * 100) : 0;
 
     db.run(
-      `UPDATE global_assets 
+      `UPDATE global_assets
        SET quantity = ?, cost_per_unit = ?, cost_basis = ?, current_price = ?, current_value = ?, gain_loss = ?, gain_loss_percent = ?, notes = ?, last_updated = ? 
        WHERE id = ?`,
       [
@@ -279,10 +282,10 @@ class ManualDataService {
     const quantity = parseFloat(data.quantity) || 0;
     const average_cost = parseFloat(data.average_cost) || 0;
     const current_price = parseFloat(data.current_price) || average_cost;
-    const cost_basis = quantity * average_cost;
-    const current_value = quantity * current_price;
-    const gain_loss = current_value - cost_basis;
-    const gain_loss_percent = cost_basis > 0 ? (gain_loss / cost_basis) * 100 : 0;
+    const cost_basis = round2(quantity * average_cost);
+    const current_value = round2(quantity * current_price);
+    const gain_loss = round2(current_value - cost_basis);
+    const gain_loss_percent = cost_basis > 0 ? round2((gain_loss / cost_basis) * 100) : 0;
 
     db.run(
       `INSERT INTO zerodha_holdings
@@ -306,10 +309,10 @@ class ManualDataService {
     const quantity = parseFloat(data.quantity) || 0;
     const average_cost = parseFloat(data.average_cost) || 0;
     const current_price = parseFloat(data.current_price) || average_cost;
-    const cost_basis = quantity * average_cost;
-    const current_value = quantity * current_price;
-    const gain_loss = current_value - cost_basis;
-    const gain_loss_percent = cost_basis > 0 ? (gain_loss / cost_basis) * 100 : 0;
+    const cost_basis = round2(quantity * average_cost);
+    const current_value = round2(quantity * current_price);
+    const gain_loss = round2(current_value - cost_basis);
+    const gain_loss_percent = cost_basis > 0 ? round2((gain_loss / cost_basis) * 100) : 0;
 
     db.run(
       `UPDATE zerodha_holdings
@@ -351,13 +354,14 @@ class ManualDataService {
     console.log('📝 Creating retirement account...');
 
     db.run(
-      `INSERT INTO retirements 
-       (account_type, provider, name, current_balance, cost_basis, has_live_data, provider_api, gain_loss, gain_loss_percent, currency, monthly_contribution, notes, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO retirements
+       (account_type, provider, name, quantity, current_balance, cost_basis, has_live_data, provider_api, gain_loss, gain_loss_percent, currency, monthly_contribution, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.account_type || 'super',
         data.provider || '',
         data.name || '',
+        data.quantity || null,
         data.current_balance || 0,
         data.cost_basis || 0,
         data.has_live_data || false,
@@ -385,17 +389,18 @@ class ManualDataService {
   static updateRetirement(id, data, callback) {
     console.log(`📝 Updating retirement account ID: ${id}`);
 
-    const gain_loss = (data.current_balance || 0) - (data.cost_basis || 0);
-    const gain_loss_percent = data.cost_basis > 0 ? (gain_loss / data.cost_basis) * 100 : 0;
+    const gain_loss = round2((data.current_balance || 0) - (data.cost_basis || 0));
+    const gain_loss_percent = data.cost_basis > 0 ? round2((gain_loss / data.cost_basis) * 100) : 0;
 
     db.run(
-      `UPDATE retirements 
-       SET account_type = ?, provider = ?, name = ?, current_balance = ?, cost_basis = ?, has_live_data = ?, provider_api = ?, gain_loss = ?, gain_loss_percent = ?, currency = ?, monthly_contribution = ?, notes = ?, updated_at = ? 
+      `UPDATE retirements
+       SET account_type = ?, provider = ?, name = ?, quantity = ?, current_balance = ?, cost_basis = ?, has_live_data = ?, provider_api = ?, gain_loss = ?, gain_loss_percent = ?, currency = ?, monthly_contribution = ?, notes = ?, updated_at = ?
        WHERE id = ?`,
       [
         data.account_type,
         data.provider,
         data.name,
+        data.quantity || null,
         data.current_balance,
         data.cost_basis,
         data.has_live_data || false,

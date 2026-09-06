@@ -295,6 +295,12 @@ export const priceAPI = {
       method: 'POST',
       body: JSON.stringify({})
     });
+  },
+
+  // Live INR/AUD and INR/USD exchange rates, used by the currency toggle
+  getExchangeRates: async () => {
+    console.log('💱 Fetching exchange rates...');
+    return await apiCall('/exchange-rates', { method: 'GET' });
   }
 };
 

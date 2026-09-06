@@ -266,9 +266,9 @@ app.get('/api/portfolio/metals', verifyToken, (req, res) => {
 });
 
 app.get('/api/portfolio/global', verifyToken, (req, res) => {
-  console.log('📍 GET /api/portfolio/global called');
+  console.log('📍 GET /api/portfolio/global called (with live VDHG price)');
 
-  PortfolioService.getGlobalAssets((err, assets) => {
+  PriceService.getGlobalAssetsWithLivePrices((err, assets) => {
     if (err) {
       console.error('❌ Error getting global assets:', err.message);
       return res.status(500).json({
@@ -280,17 +280,19 @@ app.get('/api/portfolio/global', verifyToken, (req, res) => {
 
     const totalValue = assets.reduce((sum, a) => sum + parseFloat(a.current_value || 0), 0);
     const totalInvested = assets.reduce((sum, a) => sum + parseFloat(a.cost_basis || 0), 0);
+    const gainLoss = totalValue - totalInvested;
 
-    console.log(`✅ Global assets retrieved: ${assets.length} entries`);
+    console.log(`✅ Global assets retrieved with live prices: ${assets.length} entries`);
     res.json({
       success: true,
       category: 'global',
       data: {
         holdings: assets,
         summary: {
-          totalValue: totalValue,
-          totalInvested: totalInvested,
-          gainLoss: totalValue - totalInvested
+          totalValue,
+          totalInvested,
+          gainLoss,
+          gainLossPercent: totalInvested > 0 ? (gainLoss / totalInvested) * 100 : 0
         }
       }
     });
@@ -310,6 +312,9 @@ app.get('/api/portfolio/debt', verifyToken, (req, res) => {
       });
     }
 
+    // Currency conversion for the summary total (mixed INR/AUD/USD entries) is
+    // handled client-side using the shared currency toggle and live rates from
+    // /api/exchange-rates, so the totals stay consistent with Equity/Metals/Global.
     const totalValue = debts.reduce((sum, d) => sum + parseFloat(d.invested_amount || 0), 0);
 
     console.log(`✅ Debt funds retrieved: ${debts.length} entries`);
@@ -319,18 +324,45 @@ app.get('/api/portfolio/debt', verifyToken, (req, res) => {
       data: {
         holdings: debts,
         summary: {
-          totalValue: totalValue,
-          totalInvested: totalValue
+          totalValue: parseFloat(totalValue.toFixed(2)),
+          totalInvested: parseFloat(totalValue.toFixed(2))
         }
       }
     });
   });
 });
 
-app.get('/api/portfolio/retirement', verifyToken, (req, res) => {
-  console.log('📍 GET /api/portfolio/retirement called');
+app.get('/api/exchange-rates', verifyToken, async (req, res) => {
+  console.log('📍 GET /api/exchange-rates called');
 
-  PortfolioService.getRetirements((err, retirements) => {
+  try {
+    const [audToInr, usdToInr] = await Promise.all([
+      PriceService.getAUDToINRRate(),
+      PriceService.getExchangeRate()
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        audToInr,
+        usdToInr,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error fetching exchange rates:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching exchange rates',
+      error: err.message
+    });
+  }
+});
+
+app.get('/api/portfolio/retirement', verifyToken, (req, res) => {
+  console.log('📍 GET /api/portfolio/retirement called (with live prices where applicable)');
+
+  PriceService.getRetirementsWithLivePrices((err, retirements) => {
     if (err) {
       console.error('❌ Error getting retirements:', err.message);
       return res.status(500).json({

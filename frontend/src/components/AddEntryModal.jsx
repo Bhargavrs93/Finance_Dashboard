@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/AddEntryModal.css';
 
-const AddEntryModal = ({ isOpen, category, onClose, onSubmit }) => {
+const AddEntryModal = ({ isOpen, category, initialData, onClose, onSubmit }) => {
   const [formData, setFormData] = useState({});
+  const isEdit = !!initialData;
+
+  // Pre-fill the form when opening to edit an existing entry, and reset it for a fresh "Add"
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(initialData ? { ...initialData } : {});
+    }
+  }, [isOpen, initialData]);
 
   const getFieldsForCategory = () => {
     const fields = {
@@ -18,28 +26,32 @@ const AddEntryModal = ({ isOpen, category, onClose, onSubmit }) => {
         { name: 'quantity', label: 'Quantity (grams)', type: 'number', required: true },
         { name: 'cost_per_unit', label: 'Cost per gram (₹)', type: 'number', required: true }
       ],
+      global: [
+        { name: 'name', label: 'Fund Name', type: 'text', required: true, placeholder: 'e.g., Vanguard VDHG' },
+        { name: 'quantity', label: 'No. of Units', type: 'number', required: true },
+        { name: 'cost_per_unit', label: 'Purchase Price per Unit (A$)', type: 'number', required: true },
+        { name: 'purchase_date', label: 'Date of Purchase', type: 'date', required: false }
+      ],
       debt: [
-        { name: 'fund_name', label: 'Fund Name', type: 'text', required: true },
-        { name: 'invested_amount', label: 'Amount Invested (₹)', type: 'number', required: true },
+        { name: 'name', label: 'Fund Name', type: 'text', required: true },
+        { name: 'type', label: 'Type', type: 'text', required: true, placeholder: 'e.g., Fixed Deposit, Bond' },
+        { name: 'invested_amount', label: 'Amount', type: 'number', required: true },
         { name: 'interest_rate', label: 'Interest Rate (%)', type: 'number', required: false },
-        { name: 'maturity_date', label: 'Maturity Date', type: 'date', required: false }
+        { name: 'currency', label: 'Currency (INR/AUD/USD)', type: 'text', required: true, placeholder: 'INR, AUD, or USD' },
+        { name: 'maturity_date', label: 'Maturity Date - Optional', type: 'date', required: false }
       ],
       retirement: [
-        { 
-          name: 'fund_name', 
-          label: 'Fund Name*', 
-          type: 'select', 
-          required: true,
-          options: [
-            { value: 'Hesta', label: 'Hesta Super (A$)' },
-            { value: 'SHOV', label: 'SHOV (₹)' },
-            { value: 'AFAP', label: 'AFAP (US$)' }
-          ]
-        },
-        { name: 'current_balance', label: 'Current Balance', type: 'number', required: true },
+        { name: 'name', label: 'Fund Name', type: 'text', required: true, placeholder: 'e.g., Hesta Super' },
+        { name: 'account_type', label: 'Type', type: 'text', required: true, placeholder: 'e.g., Super, 401k, PPF' },
+        { name: 'provider', label: 'Provider', type: 'text', required: true, placeholder: 'e.g., Hesta, Vanguard' },
         { name: 'currency', label: 'Currency (INR/AUD/USD)', type: 'text', required: true, placeholder: 'INR, AUD, or USD' },
-        { name: 'physical_gold_gms', label: 'Physical Gold (grams) - Optional', type: 'number', required: false },
-        { name: 'contribution_rate', label: 'Annual Contribution - Optional', type: 'number', required: false }
+        { name: 'current_balance', label: 'Current Value', type: 'number', required: true },
+        { name: 'monthly_contribution', label: 'Monthly Contribution - Optional', type: 'number', required: false }
+      ],
+      retirementGold: [
+        { name: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g., Physical Gold Holding' },
+        { name: 'quantity', label: 'Quantity (grams)', type: 'number', required: true },
+        { name: 'provider', label: 'Notes - Optional', type: 'text', required: false, placeholder: 'e.g., location, where it\'s held' }
       ]
     };
     return fields[category] || [];
@@ -67,7 +79,7 @@ const AddEntryModal = ({ isOpen, category, onClose, onSubmit }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Add {category === 'mutualFund' ? 'Mutual Fund' : category.charAt(0).toUpperCase() + category.slice(1)} Entry</h2>
+          <h2>{isEdit ? 'Edit' : 'Add'} {category === 'mutualFund' ? 'Mutual Fund' : category === 'global' ? 'Global Asset' : category === 'retirementGold' ? 'Gold Holding' : category.charAt(0).toUpperCase() + category.slice(1)} Entry</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -110,7 +122,7 @@ const AddEntryModal = ({ isOpen, category, onClose, onSubmit }) => {
           ))}
 
           <div className="modal-buttons">
-            <button type="submit" className="btn-submit">Add Entry</button>
+            <button type="submit" className="btn-submit">{isEdit ? 'Save Changes' : 'Add Entry'}</button>
             <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
           </div>
         </form>

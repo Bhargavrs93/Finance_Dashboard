@@ -32,45 +32,26 @@ class CronService {
     console.log('📊 Starting price sync from Sydney...');
 
     try {
-      // Fetch gold price with Australian-friendly API
-      const goldPrice = await PriceService.getGoldPriceAU();
-      const exchangeRate = await PriceService.getExchangeRate();
+      // Use the same gold-price-per-gram helper as Metal Holdings and the
+      // retirement live-gold feature, so all three stay consistent and this
+      // doesn't drift into a separate (and previously buggy) conversion path.
+      const { pricePerGram: priceInINR } = await PriceService.getGoldPricePerGramINR();
 
-      if (!goldPrice || !exchangeRate) {
-        console.error('❌ Failed to fetch price or exchange rate');
-        return;
-      }
-
-      console.log(`🌍 Gold price: $${goldPrice.price}/${goldPrice.unit}`);
-      console.log(`💱 Exchange rate: ${exchangeRate} INR/USD`);
-
-      // Convert to INR/gram based on source
-      let priceInINR;
-      if (goldPrice.unit === 'per gram') {
-        // Already in grams
-        priceInINR = goldPrice.price * exchangeRate;
-      } else {
-        // Convert from USD/oz to INR/gram
-        priceInINR = PriceService.convertGoldPrice(goldPrice.price, exchangeRate);
-      }
-
-      console.log(`💰 Converted price: ₹${priceInINR.toFixed(2)}/gram`);
+      console.log(`💰 Gold price: ₹${priceInINR.toFixed(2)}/gram`);
 
       // Save to price_history table
-
-      // Save to price_history table
-db.run(
-  `INSERT INTO price_history (asset_type, price, currency, source, recorded_at) 
-   VALUES (?, ?, ?, ?, ?)`,
-  ['gold', parseFloat(priceInINR.toFixed(2)), 'INR', 'daily-sync', new Date().toISOString()],
-  function(err) {
-    if (err) {
-      console.error('❌ Error saving price history:', err.message);
-    } else {
-      console.log(`✅ Price saved to history: ₹${priceInINR.toFixed(2)}/gram at ${new Date().toISOString()}`);
-    }
-  }
-);
+      db.run(
+        `INSERT INTO price_history (asset_type, price, currency, source, recorded_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        ['gold', parseFloat(priceInINR.toFixed(2)), 'INR', 'daily-sync', new Date().toISOString()],
+        function(err) {
+          if (err) {
+            console.error('❌ Error saving price history:', err.message);
+          } else {
+            console.log(`✅ Price saved to history: ₹${priceInINR.toFixed(2)}/gram at ${new Date().toISOString()}`);
+          }
+        }
+      );
 
       // Update all gold holdings with new price
       db.run(
@@ -81,6 +62,34 @@ db.run(
             console.error('❌ Error updating metals:', err.message);
           } else {
             console.log(`✅ Updated ${this.changes} gold records with new price: ₹${priceInINR.toFixed(2)}/gram`);
+          }
+        }
+      );
+
+      // Fetch and sync VDHG price alongside gold
+      const vdhgPrice = await PriceService.getVDHGPrice();
+
+      db.run(
+        `INSERT INTO price_history (asset_type, price, currency, source, recorded_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        ['vdhg', vdhgPrice.price, 'AUD', vdhgPrice.source, new Date().toISOString()],
+        function(err) {
+          if (err) {
+            console.error('❌ Error saving VDHG price history:', err.message);
+          } else {
+            console.log(`✅ VDHG price saved to history: A$${vdhgPrice.price}`);
+          }
+        }
+      );
+
+      db.run(
+        `UPDATE global_assets SET current_price = ?, last_updated = ? WHERE asset_type = 'vdhg'`,
+        [vdhgPrice.price, new Date().toISOString()],
+        function(err) {
+          if (err) {
+            console.error('❌ Error updating global assets:', err.message);
+          } else {
+            console.log(`✅ Updated ${this.changes} VDHG records with new price: A$${vdhgPrice.price}`);
           }
         }
       );

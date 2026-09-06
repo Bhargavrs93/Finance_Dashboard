@@ -7,6 +7,11 @@ class ZerodhaImportService {
     return parseFloat(String(value).replace(/,/g, '')) || 0;
   }
 
+  // Round to 2 decimal places to avoid floating-point artifacts (e.g. 12 * 75.39 = 904.6800000000001)
+  static round2(n) {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+
   static findSheet(workbook, nameContains) {
     const name = workbook.SheetNames.find(n => n.toLowerCase().includes(nameContains));
     return name ? workbook.Sheets[name] : null;
@@ -118,8 +123,8 @@ class ZerodhaImportService {
       quantity: row.quantity,
       average_cost: row.average_cost,
       current_price: row.current_price,
-      cost_basis: row.quantity * row.average_cost,
-      current_value: row.quantity * row.current_price,
+      cost_basis: this.round2(row.quantity * row.average_cost),
+      current_value: this.round2(row.quantity * row.current_price),
       gain_loss: row.gain_loss,
       gain_loss_percent: row.gain_loss_percent
     };

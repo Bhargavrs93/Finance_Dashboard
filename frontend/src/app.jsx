@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
+import { CurrencyProvider } from './CurrencyContext.jsx';
 import LoginPage from './components/LoginPage.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import DetailPage from './components/DetailPage.jsx';
@@ -23,12 +24,14 @@ function AppContent() {
   }
 
   return isAuthenticated ? (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/details/:category" element={<DetailPage />} />
-      </Routes>
-    </Router>
+    <CurrencyProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/details/:category" element={<DetailPage />} />
+        </Routes>
+      </Router>
+    </CurrencyProvider>
   ) : (
     <LoginPage />
   );

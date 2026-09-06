@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { portfolioAPI, manualAPI } from '../api';
+import { useCurrency } from '../CurrencyContext.jsx';
 import AddEntryModal from './AddEntryModal';
 import '../styles/DetailPage.css';
 
 export default function DetailPage() {
   const { category } = useParams();
   const navigate = useNavigate();
+  const { currency, convertAmount, rates } = useCurrency();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [importingHoldings, setImportingHoldings] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [addEntryMode, setAddEntryMode] = useState('default');
 
   // Fetch category data on load
   useEffect(() => {
@@ -67,25 +71,74 @@ export default function DetailPage() {
     return info[category] || { icon: '📈', title: 'Portfolio', color: '#667eea' };
   };
 
-  // Format currency
-  const formatCurrency = (value) => {
-    if (!value) return '₹0.00';
-    return '₹' + value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  // Format currency - shows the right symbol for the entry's own currency
+  // (₹ for INR, A$ for AUD, $ for USD), rather than always assuming INR
+  const formatCurrency = (value, currency = 'INR') => {
+    if (!value) value = 0;
+    const symbols = { INR: '₹', AUD: 'A$', USD: '$' };
+    const locales = { INR: 'en-IN', AUD: 'en-AU', USD: 'en-US' };
+    const symbol = symbols[currency] || '₹';
+    const locale = locales[currency] || 'en-IN';
+    return symbol + value.toLocaleString(locale, { maximumFractionDigits: 2 });
   };
 
-  // Add a manual metal entry (current price is filled in automatically from the live gold price)
-  const handleAddMetal = async (formData) => {
+  // Open the modal to add a new entry. 'mode' picks a field-set variant for
+  // this category - currently only used for Retirement's live-priced gold entry.
+  const openAddModal = (mode = 'default') => {
+    setEditingEntry(null);
+    setAddEntryMode(mode);
+    setShowAddModal(true);
+  };
+
+  // Open the modal pre-filled with an existing entry to edit
+  const openEditModal = (holding) => {
+    setEditingEntry(holding);
+    setAddEntryMode(holding.provider_api === 'gold' ? 'gold' : 'default');
+    setShowAddModal(true);
+  };
+
+  // Create or update a manual entry for the category currently shown on this page.
+  // Current price for metals/global is filled in automatically from live price feeds.
+  const handleAddEntry = async (formData) => {
+    const isEdit = !!editingEntry;
+
     try {
-      const response = await manualAPI.metals.create({ ...formData, metal_type: 'gold' });
+      let response;
+      if (category === 'metals') {
+        const payload = { ...formData, metal_type: 'gold' };
+        response = isEdit
+          ? await manualAPI.metals.update(editingEntry.id, payload)
+          : await manualAPI.metals.create(payload);
+      } else if (category === 'global') {
+        const payload = { ...formData, asset_type: 'vdhg', currency: 'AUD' };
+        response = isEdit
+          ? await manualAPI.globalAssets.update(editingEntry.id, payload)
+          : await manualAPI.globalAssets.create(payload);
+      } else if (category === 'debt') {
+        response = isEdit
+          ? await manualAPI.debtFunds.update(editingEntry.id, formData)
+          : await manualAPI.debtFunds.create(formData);
+      } else if (category === 'retirement') {
+        // Live-priced gold entries don't take a manual currency/balance - both
+        // come from the live gold price feed based on the quantity entered
+        const payload = addEntryMode === 'gold'
+          ? { ...formData, account_type: 'Physical Gold', currency: 'INR', provider_api: 'gold', has_live_data: true, current_balance: 0 }
+          : formData;
+        response = isEdit
+          ? await manualAPI.retirements.update(editingEntry.id, payload)
+          : await manualAPI.retirements.create(payload);
+      }
+
       if (response.success) {
-        alert('✅ Entry added successfully!');
+        alert(`✅ Entry ${isEdit ? 'updated' : 'added'} successfully!`);
         setShowAddModal(false);
+        setEditingEntry(null);
         fetchCategoryData();
       } else {
-        alert(`❌ Error: ${response.message || 'Error adding entry'}`);
+        alert(`❌ Error: ${response.message || 'Error saving entry'}`);
       }
     } catch (err) {
-      alert('❌ Error adding entry: ' + err.message);
+      alert(`❌ Error ${isEdit ? 'updating' : 'adding'} entry: ` + err.message);
     }
   };
 
@@ -164,6 +217,9 @@ export default function DetailPage() {
 
   const renderEquity = () => {
     const { stocks = [], mutualFunds = [], summary = {} } = data;
+    // Equity/mutual fund holdings are always stored in INR - convert to the selected toggle currency
+    const totalValue = convertAmount(summary.totalValue, 'INR', currency);
+    const totalInvested = convertAmount(summary.totalInvested, 'INR', currency);
     return (
       <>
         <div className="summary-section">
@@ -171,11 +227,11 @@ export default function DetailPage() {
           <div className="summary-grid">
             <div className="summary-item">
               <span>Total Value:</span>
-              <strong>{formatCurrency(summary.totalValue)}</strong>
+              <strong>{formatCurrency(totalValue, currency)}</strong>
             </div>
             <div className="summary-item">
               <span>Total Invested:</span>
-              <strong>{formatCurrency(summary.totalInvested)}</strong>
+              <strong>{formatCurrency(totalInvested, currency)}</strong>
             </div>
             <div className="summary-item">
               <span>% Returns:</span>
@@ -284,6 +340,10 @@ export default function DetailPage() {
 
   const renderMetals = () => {
     const { holdings = [], summary = {} } = data;
+    // Metal holdings are always priced in INR - convert to the selected toggle currency
+    const totalValue = convertAmount(summary.totalValue, 'INR', currency);
+    const totalInvested = convertAmount(summary.totalInvested, 'INR', currency);
+    const gainLoss = convertAmount(summary.gainLoss, 'INR', currency);
     return (
       <>
         <div className="summary-section">
@@ -291,16 +351,16 @@ export default function DetailPage() {
           <div className="summary-grid">
             <div className="summary-item">
               <span>Total Value:</span>
-              <strong>{formatCurrency(summary.totalValue)}</strong>
+              <strong>{formatCurrency(totalValue, currency)}</strong>
             </div>
             <div className="summary-item">
               <span>Total Invested:</span>
-              <strong>{formatCurrency(summary.totalInvested)}</strong>
+              <strong>{formatCurrency(totalInvested, currency)}</strong>
             </div>
             <div className="summary-item">
               <span>Gain/Loss:</span>
               <strong className={summary.gainLoss >= 0 ? 'positive' : 'negative'}>
-                {formatCurrency(summary.gainLoss)}
+                {formatCurrency(gainLoss, currency)}
               </strong>
             </div>
           </div>
@@ -309,7 +369,7 @@ export default function DetailPage() {
         <div className="holdings-section">
           <div className="holdings-section-header">
             <h3>Metal Holdings</h3>
-            <button className="add-entry-btn" onClick={() => setShowAddModal(true)} type="button">
+            <button className="add-entry-btn" onClick={() => openAddModal()} type="button">
               + Add Entry
             </button>
           </div>
@@ -325,6 +385,7 @@ export default function DetailPage() {
                   <th>Current Price</th>
                   <th>Current Value</th>
                   <th>Gain/Loss %</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -340,6 +401,11 @@ export default function DetailPage() {
                     <td className={holding.gain_loss_percent >= 0 ? 'positive' : 'negative'}>
                       {holding.gain_loss_percent?.toFixed(2)}%
                     </td>
+                    <td>
+                      <button className="edit-btn" onClick={() => openEditModal(holding)} type="button">
+                        ✏️ Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -354,6 +420,10 @@ export default function DetailPage() {
 
   const renderGlobal = () => {
     const { holdings = [], summary = {} } = data;
+    // Global (VDHG) holdings are always priced in AUD - convert to the selected toggle currency
+    const totalValue = convertAmount(summary.totalValue, 'AUD', currency);
+    const totalInvested = convertAmount(summary.totalInvested, 'AUD', currency);
+    const gainLoss = convertAmount(summary.gainLoss, 'AUD', currency);
     return (
       <>
         <div className="summary-section">
@@ -361,52 +431,67 @@ export default function DetailPage() {
           <div className="summary-grid">
             <div className="summary-item">
               <span>Total Value:</span>
-              <strong>{formatCurrency(summary.totalValue)}</strong>
+              <strong>{formatCurrency(totalValue, currency)}</strong>
             </div>
             <div className="summary-item">
               <span>Total Invested:</span>
-              <strong>{formatCurrency(summary.totalInvested)}</strong>
+              <strong>{formatCurrency(totalInvested, currency)}</strong>
             </div>
             <div className="summary-item">
               <span>Gain/Loss:</span>
               <strong className={summary.gainLoss >= 0 ? 'positive' : 'negative'}>
-                {formatCurrency(summary.gainLoss)}
+                {formatCurrency(gainLoss, currency)}
               </strong>
             </div>
           </div>
         </div>
 
         <div className="holdings-section">
-          <h3>Global Assets</h3>
+          <div className="holdings-section-header">
+            <h3>Global Assets</h3>
+            <button className="add-entry-btn" onClick={() => openAddModal()} type="button">
+              + Add Entry
+            </button>
+          </div>
           {holdings.length > 0 ? (
             <table className="holdings-table">
               <thead>
                 <tr>
-                  <th>Asset</th>
-                  <th>Symbol</th>
-                  <th>Quantity</th>
-                  <th>Cost Per Unit</th>
-                  <th>Cost Basis</th>
+                  <th>Fund Name</th>
+                  <th>Units</th>
+                  <th>Unit Price</th>
+                  <th>Purchase Date</th>
+                  <th>Total Price</th>
                   <th>Current Price</th>
                   <th>Current Value</th>
+                  <th>% Change</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {holdings.map((holding, idx) => (
                   <tr key={idx}>
                     <td>{holding.name}</td>
-                    <td>{holding.symbol}</td>
                     <td>{holding.quantity}</td>
-                    <td>{holding.currency} {holding.cost_per_unit}</td>
-                    <td>{holding.currency} {holding.cost_basis}</td>
-                    <td>{holding.currency} {holding.current_price}</td>
-                    <td>{holding.currency} {holding.current_value}</td>
+                    <td>{formatCurrency(holding.cost_per_unit, holding.currency)}</td>
+                    <td>{holding.purchase_date || 'N/A'}</td>
+                    <td>{formatCurrency(holding.cost_basis, holding.currency)}</td>
+                    <td>{formatCurrency(holding.current_price, holding.currency)}</td>
+                    <td>{formatCurrency(holding.current_value, holding.currency)}</td>
+                    <td className={holding.gain_loss_percent >= 0 ? 'positive' : 'negative'}>
+                      {holding.gain_loss_percent?.toFixed(2)}%
+                    </td>
+                    <td>
+                      <button className="edit-btn" onClick={() => openEditModal(holding)} type="button">
+                        ✏️ Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p>No global assets found</p>
+            <p>No global assets found. Add an entry to get started.</p>
           )}
         </div>
       </>
@@ -415,6 +500,14 @@ export default function DetailPage() {
 
   const renderDebt = () => {
     const { holdings = [], summary = {} } = data;
+    // Debt entries can each have their own currency (INR/AUD/USD) - convert every
+    // row to the selected toggle currency individually, then sum, so mixed-currency
+    // funds add up correctly regardless of which toggle is selected.
+    const totalValue = holdings.reduce(
+      (sum, h) => sum + convertAmount(h.invested_amount, h.currency, currency),
+      0
+    );
+    const hasOtherCurrency = holdings.some(h => (h.currency || 'INR') !== currency);
     return (
       <>
         <div className="summary-section">
@@ -422,13 +515,23 @@ export default function DetailPage() {
           <div className="summary-grid">
             <div className="summary-item">
               <span>Total Value:</span>
-              <strong>{formatCurrency(summary.totalValue)}</strong>
+              <strong>{formatCurrency(totalValue, currency)}</strong>
             </div>
           </div>
+          {hasOtherCurrency && (
+            <p className="summary-note">
+              Converted to {currency} using live exchange rates (1 AUD = ₹{rates.audToInr.toFixed(2)}, 1 USD = ₹{rates.usdToInr.toFixed(2)})
+            </p>
+          )}
         </div>
 
         <div className="holdings-section">
-          <h3>Debt Funds</h3>
+          <div className="holdings-section-header">
+            <h3>Debt Funds</h3>
+            <button className="add-entry-btn" onClick={() => openAddModal()} type="button">
+              + Add Entry
+            </button>
+          </div>
           {holdings.length > 0 ? (
             <table className="holdings-table">
               <thead>
@@ -439,6 +542,7 @@ export default function DetailPage() {
                   <th>Interest Rate</th>
                   <th>Currency</th>
                   <th>Status</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -446,16 +550,21 @@ export default function DetailPage() {
                   <tr key={idx}>
                     <td>{holding.name}</td>
                     <td>{holding.type}</td>
-                    <td>{formatCurrency(holding.invested_amount)}</td>
+                    <td>{formatCurrency(holding.invested_amount, holding.currency)}</td>
                     <td>{holding.interest_rate}%</td>
                     <td>{holding.currency}</td>
                     <td>{holding.status}</td>
+                    <td>
+                      <button className="edit-btn" onClick={() => openEditModal(holding)} type="button">
+                        ✏️ Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p>No debt funds found</p>
+            <p>No debt funds found. Add an entry to get started.</p>
           )}
         </div>
       </>
@@ -463,7 +572,14 @@ export default function DetailPage() {
   };
 
   const renderRetirement = () => {
-    const { holdings = [], summary = {} } = data;
+    const { holdings = [] } = data;
+    // Retirement accounts can each have their own currency (INR/AUD/USD) - convert
+    // every row to the selected toggle currency individually, then sum, same as Debt.
+    const totalValue = holdings.reduce(
+      (sum, h) => sum + convertAmount(h.current_balance, h.currency, currency),
+      0
+    );
+    const hasOtherCurrency = holdings.some(h => (h.currency || 'INR') !== currency);
     return (
       <>
         <div className="summary-section">
@@ -471,17 +587,28 @@ export default function DetailPage() {
           <div className="summary-grid">
             <div className="summary-item">
               <span>Total Value:</span>
-              <strong>{formatCurrency(summary.totalValue)}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Total Invested:</span>
-              <strong>{formatCurrency(summary.totalInvested)}</strong>
+              <strong>{formatCurrency(totalValue, currency)}</strong>
             </div>
           </div>
+          {hasOtherCurrency && (
+            <p className="summary-note">
+              Converted to {currency} using live exchange rates (1 AUD = ₹{rates.audToInr.toFixed(2)}, 1 USD = ₹{rates.usdToInr.toFixed(2)})
+            </p>
+          )}
         </div>
 
         <div className="holdings-section">
-          <h3>Retirement Accounts</h3>
+          <div className="holdings-section-header">
+            <h3>Retirement Accounts</h3>
+            <div>
+              <button className="add-entry-btn" onClick={() => openAddModal('gold')} type="button">
+                + Add Gold Holding
+              </button>{' '}
+              <button className="add-entry-btn" onClick={() => openAddModal()} type="button">
+                + Add Entry
+              </button>
+            </div>
+          </div>
           {holdings.length > 0 ? (
             <table className="holdings-table">
               <thead>
@@ -489,9 +616,12 @@ export default function DetailPage() {
                   <th>Account</th>
                   <th>Type</th>
                   <th>Provider</th>
+                  <th>Quantity</th>
+                  <th>Current Price</th>
                   <th>Balance</th>
                   <th>Currency</th>
                   <th>Monthly Contribution</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -500,15 +630,26 @@ export default function DetailPage() {
                     <td>{holding.name}</td>
                     <td>{holding.account_type}</td>
                     <td>{holding.provider}</td>
-                    <td>{formatCurrency(holding.current_balance)}</td>
+                    <td>{holding.provider_api === 'gold' ? `${holding.quantity}g` : 'N/A'}</td>
+                    <td>
+                      {holding.price_source === 'live'
+                        ? `${formatCurrency(holding.current_price, holding.currency)}/g 🔴 Live`
+                        : 'N/A'}
+                    </td>
+                    <td>{formatCurrency(holding.current_balance, holding.currency)}</td>
                     <td>{holding.currency}</td>
-                    <td>{formatCurrency(holding.monthly_contribution)}</td>
+                    <td>{formatCurrency(holding.monthly_contribution, holding.currency)}</td>
+                    <td>
+                      <button className="edit-btn" onClick={() => openEditModal(holding)} type="button">
+                        ✏️ Edit
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           ) : (
-            <p>No retirement accounts found</p>
+            <p>No retirement accounts found. Add an entry to get started.</p>
           )}
         </div>
       </>
@@ -544,9 +685,10 @@ export default function DetailPage() {
       {/* Add Entry Modal */}
       <AddEntryModal
         isOpen={showAddModal}
-        category="metals"
-        onClose={() => setShowAddModal(false)}
-        onSubmit={handleAddMetal}
+        category={category === 'retirement' && addEntryMode === 'gold' ? 'retirementGold' : category}
+        initialData={editingEntry}
+        onClose={() => { setShowAddModal(false); setEditingEntry(null); setAddEntryMode('default'); }}
+        onSubmit={handleAddEntry}
       />
     </div>
   );

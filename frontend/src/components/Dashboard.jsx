@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
+import { useCurrency } from '../CurrencyContext.jsx';
 import { portfolioAPI, manualAPI } from '../api.js';
 import '../styles/Dashboard.css';
 import AddEntryModal from './AddEntryModal.jsx';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const { currency, setCurrency, convertAmount } = useCurrency();
   const navigate = useNavigate();
   const [portfolioData, setPortfolioData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currency, setCurrency] = useState('INR');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
@@ -82,14 +83,15 @@ export default function Dashboard() {
     minute: '2-digit'
   });
 
-  // Format currency
+  // Format currency - the backend reports everything in INR, so convert to
+  // the toggled currency (using live rates) before formatting, rather than
+  // just swapping the symbol on the same underlying number.
   const formatCurrency = (value) => {
-    if (!value) return '₹0.00';
-    if (currency === 'INR') {
-      return '₹' + value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
-    } else {
-      return 'A$' + value.toLocaleString('en-AU', { maximumFractionDigits: 2 });
+    const converted = convertAmount(value || 0, 'INR', currency);
+    if (currency === 'AUD') {
+      return 'A$' + converted.toLocaleString('en-AU', { maximumFractionDigits: 2 });
     }
+    return '₹' + converted.toLocaleString('en-IN', { maximumFractionDigits: 2 });
   };
 
   if (loading) {

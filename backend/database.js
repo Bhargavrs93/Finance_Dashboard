@@ -35,5 +35,31 @@ db.all('PRAGMA table_info(zerodha_holdings)', [], (err, columns) => {
   }
 });
 
+// Migration: add 'currency' column to price_history if it doesn't exist yet
+// (gold/VDHG price sync inserts a currency value; without this column every
+// price_history insert silently failed and history was never recorded)
+db.all('PRAGMA table_info(price_history)', [], (err, columns) => {
+  if (err) return;
+  const hasCurrency = columns.some(col => col.name === 'currency');
+  if (!hasCurrency && columns.length > 0) {
+    db.run('ALTER TABLE price_history ADD COLUMN currency VARCHAR(3)', (err) => {
+      if (!err) console.log('✅ Migrated price_history: added currency column');
+    });
+  }
+});
+
+// Migration: add 'quantity' column to retirements if it doesn't exist yet
+// (used for retirement entries that track a physical asset like gold by
+// weight, with the balance recomputed live from the current price)
+db.all('PRAGMA table_info(retirements)', [], (err, columns) => {
+  if (err) return;
+  const hasQuantity = columns.some(col => col.name === 'quantity');
+  if (!hasQuantity && columns.length > 0) {
+    db.run('ALTER TABLE retirements ADD COLUMN quantity DECIMAL(10, 2)', (err) => {
+      if (!err) console.log('✅ Migrated retirements: added quantity column');
+    });
+  }
+});
+
 // Export database connection
 module.exports = db;

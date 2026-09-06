@@ -93,6 +93,7 @@ const createTablesSQL = [
     account_type VARCHAR(30) NOT NULL,
     provider VARCHAR(50),
     name VARCHAR(100),
+    quantity DECIMAL(10, 2),
     current_balance DECIMAL(12, 2) NOT NULL,
     cost_basis DECIMAL(12, 2),
     has_live_data BOOLEAN,
@@ -112,6 +113,7 @@ const createTablesSQL = [
     asset_type VARCHAR(30),
     symbol VARCHAR(50),
     price DECIMAL(10, 4),
+    currency VARCHAR(3),
     price_date DATE,
     source VARCHAR(50),
     recorded_at TIMESTAMP
