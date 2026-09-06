@@ -52,9 +52,25 @@ const AddEntryModal = ({ isOpen, category, initialData, onClose, onSubmit }) => 
         { name: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g., Physical Gold Holding' },
         { name: 'quantity', label: 'Quantity (grams)', type: 'number', required: true },
         { name: 'provider', label: 'Notes - Optional', type: 'text', required: false, placeholder: 'e.g., location, where it\'s held' }
+      ],
+      goal: [
+        { name: 'name', label: 'Goal Name', type: 'text', required: true, placeholder: 'e.g., Emergency Fund' },
+        { name: 'icon', label: 'Icon (emoji) - Optional', type: 'text', required: false, placeholder: '🎯' },
+        { name: 'description', label: 'Description', type: 'text', required: false, placeholder: 'e.g., ₹1.35Cr in 18 months' },
+        { name: 'progress_percent', label: 'Progress (%)', type: 'number', required: true }
       ]
     };
     return fields[category] || [];
+  };
+
+  const getCategoryTitle = () => {
+    const titles = {
+      mutualFund: 'Mutual Fund',
+      global: 'Global Asset',
+      retirementGold: 'Gold Holding',
+      goal: 'Goal'
+    };
+    return titles[category] || (category.charAt(0).toUpperCase() + category.slice(1));
   };
 
   const handleInputChange = (e) => {
@@ -79,7 +95,7 @@ const AddEntryModal = ({ isOpen, category, initialData, onClose, onSubmit }) => 
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{isEdit ? 'Edit' : 'Add'} {category === 'mutualFund' ? 'Mutual Fund' : category === 'global' ? 'Global Asset' : category === 'retirementGold' ? 'Gold Holding' : category.charAt(0).toUpperCase() + category.slice(1)} Entry</h2>
+          <h2>{isEdit ? 'Edit' : 'Add'} {getCategoryTitle()} Entry</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
 

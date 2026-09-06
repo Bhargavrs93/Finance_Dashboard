@@ -94,115 +94,315 @@
   border-color: white;
 }
 
-/* Summary Cards */
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+/* Financial Independence Progress */
+.fi-section {
   margin-bottom: 30px;
 }
 
-.card {
+.fi-section h2,
+.waterfall-section h2,
+.allocation-section h2,
+.goals-section h2,
+.accounts-section h2 {
+  margin: 0 0 20px 0;
+  font-size: 1.4rem;
+  color: #333;
+}
+
+.fi-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.fi-card,
+.waterfall-card {
   background: white;
   padding: 20px;
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
-  gap: 15px;
-  transition: all 0.3s;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+.fi-label,
+.waterfall-label {
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
-.card-icon {
-  font-size: 2rem;
-  min-width: 50px;
-  text-align: center;
+.fi-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #333;
 }
 
-.card-content {
-  flex: 1;
+.fi-value.blue {
+  color: #667eea;
 }
 
-.card-label {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #666;
-  font-weight: 500;
+.fi-value.positive {
+  color: #27ae60;
 }
 
-.card-value {
-  margin: 8px 0 0 0;
+.fi-value.negative {
+  color: #e74c3c;
+}
+
+.fi-note,
+.waterfall-note {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+/* Net Worth Waterfall */
+.waterfall-section {
+  margin-bottom: 30px;
+}
+
+.waterfall-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.waterfall-card strong {
   font-size: 1.5rem;
   font-weight: 700;
   color: #333;
 }
 
-.card-value.positive {
+.waterfall-card strong.positive {
   color: #27ae60;
 }
 
-.card-value.negative {
-  color: #e74c3c;
+.waterfall-card strong.neutral {
+  color: #999;
 }
 
-/* Portfolio Breakdown */
-.portfolio-breakdown {
-  margin: 30px 0;
+.networth-banner {
+  background: #e8f0fe;
+  border-radius: 10px;
+  padding: 18px 20px;
 }
 
-.portfolio-breakdown h2 {
-  margin: 0 0 20px 0;
-  font-size: 1.5rem;
-  color: #333;
+.networth-banner strong {
+  display: block;
+  color: #1a56db;
+  font-size: 1.1rem;
+  margin-bottom: 6px;
 }
 
-/* Charts Container */
-.charts-container {
+.networth-banner p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* Liquid Portfolio Allocation */
+.allocation-section {
+  margin-bottom: 30px;
+}
+
+.donut-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
-  margin-top: 20px;
 }
 
-.chart-item {
+.donut-card {
   background: white;
   padding: 20px;
   border-radius: 10px;
-  border-left: 4px solid #667eea;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s;
 }
 
-.chart-item.clickable:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
-}
-
-.chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.chart-name {
-  font-weight: 600;
+.donut-card h4 {
+  margin: 0 0 15px 0;
   font-size: 1rem;
   color: #333;
 }
 
-.chart-percent {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 4px 10px;
-  border-radius: 20px;
+.donut-chart {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   font-size: 0.85rem;
+  color: #555;
+}
+
+.donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.donut-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Goals */
+.goals-section {
+  margin-bottom: 30px;
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header-row h2 {
+  margin: 0;
+}
+
+.add-entry-btn {
+  padding: 8px 16px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
   font-weight: 600;
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+
+.add-entry-btn:hover {
+  background: #5568d3;
+}
+
+.goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goal-item {
+  background: white;
+  padding: 16px 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.goal-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 200px;
+}
+
+.goal-icon {
+  font-size: 1.5rem;
+}
+
+.goal-name {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+}
+
+.goal-desc {
+  margin: 2px 0 0 0;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.goal-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.goal-progress .progress-bar {
+  flex: 1;
+  min-width: 100px;
+}
+
+.goal-percent {
+  font-weight: 600;
+  color: #333;
+  min-width: 40px;
+  text-align: right;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 2px 4px;
+}
+
+/* Accounts */
+.accounts-section {
+  margin-bottom: 30px;
+}
+
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-item {
+  background: white;
+  padding: 16px 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.account-item.clickable {
+  cursor: pointer;
+}
+
+.account-item.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.account-name {
+  margin: 0;
+  font-weight: 600;
+  color: #333;
+}
+
+.account-desc {
+  margin: 2px 0 0 0;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.account-item strong {
+  font-size: 1.1rem;
+  color: #333;
 }
 
 .progress-bar {
@@ -211,7 +411,6 @@
   background: #f0f0f0;
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 12px;
 }
 
 .progress-fill {
@@ -219,47 +418,8 @@
   transition: width 0.3s ease;
 }
 
-.progress-fill.equity {
-  background: linear-gradient(90deg, #3498db, #2980b9);
-}
-
-.progress-fill.metals {
-  background: linear-gradient(90deg, #f39c12, #d68910);
-}
-
-.progress-fill.global {
-  background: linear-gradient(90deg, #27ae60, #229954);
-}
-
-.progress-fill.debt {
-  background: linear-gradient(90deg, #e74c3c, #c0392b);
-}
-
-.progress-fill.retirement {
-  background: linear-gradient(90deg, #9b59b6, #8e44ad);
-}
-
-.chart-details {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.chart-details p {
-  margin: 4px 0;
-}
-
-.api-source {
-  font-size: 0.8rem;
-  color: #667eea;
-  margin-top: 5px;
-  font-style: italic;
-}
-
-.manual-source {
-  font-size: 0.8rem;
-  color: #e74c3c;
-  margin-top: 5px;
-  font-style: italic;
+.progress-fill.goal {
+  background: linear-gradient(90deg, #667eea, #764ba2);
 }
 
 /* Footer */
@@ -302,48 +462,6 @@
   margin: 0;
   font-size: 0.85rem;
   color: #999;
-}
-
-/* Dropdown Button Styles */
-.dropdown-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  min-width: 160px;
-  margin-top: 5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  display: none;
-  z-index: 100;
-  overflow: hidden;
-}
-
-.dropdown-wrapper:hover .dropdown-menu {
-  display: block;
-}
-
-.dropdown-item {
-  display: block;
-  width: 100%;
-  padding: 10px 16px;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  font-size: 0.9rem;
-  color: #333;
-  transition: background 0.2s;
-}
-
-.dropdown-item:hover {
-  background: #f5f5f5;
 }
 
 /* Loading & Error States */
@@ -389,12 +507,16 @@
     width: 100%;
   }
 
-  .summary-cards {
+  .fi-cards,
+  .waterfall-cards,
+  .donut-row {
     grid-template-columns: 1fr;
   }
 
-  .charts-container {
-    grid-template-columns: 1fr;
+  .goal-item,
+  .account-item {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .dashboard {

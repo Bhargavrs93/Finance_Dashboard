@@ -5,6 +5,20 @@ import { useCurrency } from '../CurrencyContext.jsx';
 import { portfolioAPI, manualAPI } from '../api.js';
 import '../styles/Dashboard.css';
 import AddEntryModal from './AddEntryModal.jsx';
+import DonutChart from './DonutChart.jsx';
+
+const CATEGORY_META = {
+  equity: { label: 'Equity', color: '#667eea' },
+  metals: { label: 'Metals', color: '#f5576c' },
+  global: { label: 'Global', color: '#00f2fe' },
+  debt: { label: 'Debt / Cash', color: '#38f9d7' }
+};
+
+const CURRENCY_META = {
+  INR: { color: '#FF9933' },
+  AUD: { color: '#00247D' },
+  USD: { color: '#2E7D32' }
+};
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -13,12 +27,15 @@ export default function Dashboard() {
   const [portfolioData, setPortfolioData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
 
-  // Fetch portfolio data on load
+  const [goals, setGoals] = useState([]);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
+
+  // Fetch portfolio + goals on load
   useEffect(() => {
     fetchPortfolioData();
+    fetchGoals();
   }, []);
 
   const fetchPortfolioData = async () => {
@@ -37,39 +54,51 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddEntry = async (formData) => {
+  const fetchGoals = async () => {
     try {
-      let response;
+      const response = await manualAPI.goals.getAll();
+      setGoals(response.data || []);
+    } catch (err) {
+      console.error('❌ Error fetching goals:', err);
+    }
+  };
 
-      if (selectedCategory === 'mutualFund') {
-        // Add manual mutual fund entry
-        response = await manualAPI.mutualFunds.create(formData);
-      } else if (selectedCategory === 'metals') {
-        // Add metal
-        const metalPayload = {
-          ...formData,
-          metal_type: 'gold'
-        };
-        response = await manualAPI.metals.create(metalPayload);
-      } else if (selectedCategory === 'debt') {
-        // Add debt fund
-        response = await manualAPI.debtFunds.create(formData);
-      } else if (selectedCategory === 'retirement') {
-        // Add retirement account
-        response = await manualAPI.retirements.create(formData);
-      }
+  const openAddGoalModal = () => {
+    setEditingGoal(null);
+    setShowGoalModal(true);
+  };
+
+  const openEditGoalModal = (goal) => {
+    setEditingGoal(goal);
+    setShowGoalModal(true);
+  };
+
+  const handleGoalSubmit = async (formData) => {
+    const isEdit = !!editingGoal;
+    try {
+      const response = isEdit
+        ? await manualAPI.goals.update(editingGoal.id, formData)
+        : await manualAPI.goals.create(formData);
 
       if (response.success) {
-        alert('✅ Entry added successfully!');
-        setShowAddModal(false);
-        // Refresh data
-        setTimeout(() => fetchPortfolioData(), 500);
+        setShowGoalModal(false);
+        setEditingGoal(null);
+        fetchGoals();
       } else {
-        alert(`❌ Error: ${response.message || 'Error adding entry'}`);
+        alert(`❌ Error: ${response.message || 'Error saving goal'}`);
       }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('❌ Error adding entry: ' + error.message);
+    } catch (err) {
+      alert(`❌ Error ${isEdit ? 'updating' : 'adding'} goal: ` + err.message);
+    }
+  };
+
+  const handleDeleteGoal = async (id) => {
+    if (!window.confirm('Delete this goal?')) return;
+    try {
+      await manualAPI.goals.delete(id);
+      fetchGoals();
+    } catch (err) {
+      alert('❌ Error deleting goal: ' + err.message);
     }
   };
 
@@ -116,7 +145,27 @@ export default function Dashboard() {
     return <div className="dashboard-loading"><h2>No data available</h2></div>;
   }
 
-  const { summary, breakdown } = portfolioData;
+  const { summary, breakdown, fi } = portfolioData;
+
+  const assetSegments = (fi.assetAllocation || []).map(item => ({
+    label: CATEGORY_META[item.category]?.label || item.category,
+    percent: item.percent,
+    color: CATEGORY_META[item.category]?.color || '#ccc'
+  }));
+
+  const geoSegments = (fi.geographicExposure || []).map(item => ({
+    label: item.currency,
+    percent: item.percent,
+    color: CURRENCY_META[item.currency]?.color || '#ccc'
+  }));
+
+  const accounts = [
+    { name: 'Zerodha (IN)', description: 'Equities, mutual funds', value: breakdown.equity.value, route: '/details/equity' },
+    { name: 'Vanguard (AU)', description: 'VDHG, diversified ETFs', value: breakdown.global.value, route: '/details/global' },
+    { name: 'Debt / Cash holdings', description: 'FDs, cash deposits', value: breakdown.debt.value, route: '/details/debt' },
+    { name: 'Precious metals', description: 'Gold, silver holdings', value: breakdown.metals.value, route: '/details/metals' },
+    { name: 'Retirement (locked)', description: 'Super, PPF, physical gold', value: breakdown.retirement.value, route: '/details/retirement' }
+  ];
 
   return (
     <div className="dashboard">
@@ -154,163 +203,127 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Summary Cards */}
-      <section className="summary-cards">
-        <div className="card">
-          <div className="card-icon">💰</div>
-          <div className="card-content">
-            <p className="card-label">Total Value</p>
-            <p className="card-value">
-              {formatCurrency(summary.totalValue)}
-            </p>
+      {/* Financial Independence Progress */}
+      <section className="fi-section">
+        <h2>Financial Independence progress</h2>
+        <div className="fi-cards">
+          <div className="fi-card">
+            <span className="fi-label">Investable Assets</span>
+            <strong className="fi-value blue">{formatCurrency(fi.investableAssets)}</strong>
+            <span className="fi-note">Liquid + active</span>
           </div>
-        </div>
-
-        <div className="card">
-          <div className="card-icon">📊</div>
-          <div className="card-content">
-            <p className="card-label">Total Invested</p>
-            <p className="card-value">
-              {formatCurrency(summary.totalInvested)}
-            </p>
+          <div className="fi-card">
+            <span className="fi-label">FI Target ({fi.fiTarget ? '25x' : '—'})</span>
+            <strong className="fi-value">{formatCurrency(fi.fiTarget)}</strong>
+            <span className="fi-note">Annual expenses × 25</span>
           </div>
-        </div>
-
-        <div className="card">
-          <div className="card-icon">📈</div>
-          <div className="card-content">
-            <p className="card-label">Gain / Loss</p>
-            <p className={`card-value ${summary.gainLoss >= 0 ? 'positive' : 'negative'}`}>
-              {formatCurrency(summary.gainLoss)}
-            </p>
+          <div className="fi-card">
+            <span className="fi-label">Progress</span>
+            <strong className="fi-value blue">{fi.progress.toFixed(0)}%</strong>
+            <span className="fi-note">Toward financial independence</span>
           </div>
-        </div>
-
-        <div className="card">
-          <div className="card-icon">📉</div>
-          <div className="card-content">
-            <p className="card-label">Return %</p>
-            <p className={`card-value ${summary.gainLossPercent >= 0 ? 'positive' : 'negative'}`}>
-              {summary.gainLossPercent.toFixed(2)}%
-            </p>
+          <div className="fi-card">
+            <span className="fi-label">Return</span>
+            <strong className={`fi-value ${fi.returnPercent >= 0 ? 'positive' : 'negative'}`}>
+              {fi.returnPercent.toFixed(1)}%
+            </strong>
+            <span className="fi-note">Overall return on liquid assets</span>
           </div>
         </div>
       </section>
 
-      {/* Portfolio Breakdown */}
-      <section className="portfolio-breakdown">
-        <h2>Portfolio Allocation</h2>
-
-        <div className="charts-container">
-          {/* Equity */}
-          <div 
-            className="chart-item clickable"
-            onClick={() => navigate('/details/equity')}
-          >
-            <div className="chart-header">
-              <span className="chart-name">📊 Equity</span>
-              <span className="chart-percent">{breakdown.equity.allocation?.toFixed(1)}%</span>
-            </div>
-            <div className="progress-bar">
-              <div
-                className="progress-fill equity"
-                style={{ width: `${breakdown.equity.allocation || 0}%` }}
-              ></div>
-            </div>
-            <div className="chart-details">
-              <p>Value: {formatCurrency(breakdown.equity.value)}</p>
-              <p>Holdings: {breakdown.equity.count}</p>
-              <p className="api-source">📡 Live from Zerodha</p>
-            </div>
+      {/* Net Worth Waterfall */}
+      <section className="waterfall-section">
+        <h2>Total net worth waterfall</h2>
+        <div className="waterfall-cards">
+          <div className="waterfall-card">
+            <span className="waterfall-label">Illiquid &amp; locked</span>
+            <strong>{formatCurrency(fi.illiquidLocked)}</strong>
+            <span className="waterfall-note">Super, PF, physical gold</span>
           </div>
-
-          {/* Metals */}
-          <div 
-            className="chart-item clickable"
-            onClick={() => navigate('/details/metals')}
-          >
-            <div className="chart-header">
-              <span className="chart-name">🪙 Metals</span>
-              <span className="chart-percent">{breakdown.metals.allocation?.toFixed(1)}%</span>
-            </div>
-            <div className="progress-bar">
-              <div
-                className="progress-fill metals"
-                style={{ width: `${breakdown.metals.allocation || 0}%` }}
-              ></div>
-            </div>
-            <div className="chart-details">
-              <p>Value: {formatCurrency(breakdown.metals.value)}</p>
-              <p>Holdings: {breakdown.metals.count}</p>
-              <p className="manual-source">✏️ Manual + Live Prices</p>
-            </div>
+          <div className="waterfall-card">
+            <span className="waterfall-label">Semi-liquid</span>
+            <strong className="neutral">{formatCurrency(fi.semiLiquid)}</strong>
+            <span className="waterfall-note">Property, long-term holds</span>
           </div>
-
-          {/* Global */}
-          <div 
-            className="chart-item clickable"
-            onClick={() => navigate('/details/global')}
-          >
-            <div className="chart-header">
-              <span className="chart-name">🌍 Global</span>
-              <span className="chart-percent">{breakdown.global.allocation?.toFixed(1)}%</span>
-            </div>
-            <div className="progress-bar">
-              <div
-                className="progress-fill global"
-                style={{ width: `${breakdown.global.allocation || 0}%` }}
-              ></div>
-            </div>
-            <div className="chart-details">
-              <p>Value: {formatCurrency(breakdown.global.value)}</p>
-              <p>Holdings: {breakdown.global.count}</p>
-              <p className="api-source">📡 Live from Vanguard</p>
-            </div>
+          <div className="waterfall-card">
+            <span className="waterfall-label">Liquid investments</span>
+            <strong className="positive">{formatCurrency(fi.investableAssets)}</strong>
+            <span className="waterfall-note">Active portfolio</span>
           </div>
+        </div>
+        <div className="networth-banner">
+          <strong>Total net worth: {formatCurrency(fi.totalNetWorth)}</strong>
+          <p>For FI tracking, focus on liquid assets ({formatCurrency(fi.investableAssets)}). Illiquid assets are wealth, not income sources.</p>
+        </div>
+      </section>
 
-          {/* Debt */}
-          <div 
-            className="chart-item clickable"
-            onClick={() => navigate('/details/debt')}
-          >
-            <div className="chart-header">
-              <span className="chart-name">💳 Debt</span>
-              <span className="chart-percent">{breakdown.debt.allocation?.toFixed(1)}%</span>
-            </div>
-            <div className="progress-bar">
-              <div
-                className="progress-fill debt"
-                style={{ width: `${breakdown.debt.allocation || 0}%` }}
-              ></div>
-            </div>
-            <div className="chart-details">
-              <p>Value: {formatCurrency(breakdown.debt.value)}</p>
-              <p>Holdings: {breakdown.debt.count}</p>
-              <p className="manual-source">✏️ Manual Entry</p>
-            </div>
+      {/* Liquid Portfolio Allocation */}
+      <section className="allocation-section">
+        <h2>Liquid portfolio allocation</h2>
+        <div className="donut-row">
+          <div className="donut-card">
+            <h4>By asset class</h4>
+            {assetSegments.length > 0 ? <DonutChart segments={assetSegments} /> : <p>No liquid holdings yet</p>}
           </div>
+          <div className="donut-card">
+            <h4>Currency exposure</h4>
+            {geoSegments.length > 0 ? <DonutChart segments={geoSegments} /> : <p>No liquid holdings yet</p>}
+          </div>
+        </div>
+      </section>
 
-          {/* Retirement */}
-          <div 
-            className="chart-item clickable"
-            onClick={() => navigate('/details/retirement')}
-          >
-            <div className="chart-header">
-              <span className="chart-name">🏦 Retirement</span>
-              <span className="chart-percent">{breakdown.retirement.allocation?.toFixed(1)}%</span>
+      {/* Active Wealth-Building Goals */}
+      <section className="goals-section">
+        <div className="section-header-row">
+          <h2>Active wealth-building goals</h2>
+          <button className="add-entry-btn" onClick={openAddGoalModal} type="button">
+            + Add Goal
+          </button>
+        </div>
+        <div className="goals-list">
+          {goals.length > 0 ? (
+            goals.map(goal => (
+              <div className="goal-item" key={goal.id}>
+                <div className="goal-info">
+                  <span className="goal-icon">{goal.icon || '🎯'}</span>
+                  <div>
+                    <p className="goal-name">{goal.name}</p>
+                    {goal.description && <p className="goal-desc">{goal.description}</p>}
+                  </div>
+                </div>
+                <div className="goal-progress">
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill goal"
+                      style={{ width: `${Math.min(goal.progress_percent, 100)}%` }}
+                    ></div>
+                  </div>
+                  <span className="goal-percent">{goal.progress_percent}%</span>
+                  <button className="icon-btn" onClick={() => openEditGoalModal(goal)} type="button">✏️</button>
+                  <button className="icon-btn" onClick={() => handleDeleteGoal(goal.id)} type="button">🗑️</button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p>No goals yet. Add one to start tracking your progress.</p>
+          )}
+        </div>
+      </section>
+
+      {/* Accounts */}
+      <section className="accounts-section">
+        <h2>Accounts</h2>
+        <div className="account-list">
+          {accounts.map(acc => (
+            <div className="account-item clickable" onClick={() => navigate(acc.route)} key={acc.name}>
+              <div>
+                <p className="account-name">{acc.name}</p>
+                <p className="account-desc">{acc.description}</p>
+              </div>
+              <strong>{formatCurrency(acc.value)}</strong>
             </div>
-            <div className="progress-bar">
-              <div
-                className="progress-fill retirement"
-                style={{ width: `${breakdown.retirement.allocation || 0}%` }}
-              ></div>
-            </div>
-            <div className="chart-details">
-              <p>Value: {formatCurrency(breakdown.retirement.value)}</p>
-              <p>Holdings: {breakdown.retirement.count}</p>
-              <p className="manual-source">✏️ Manual Entry</p>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
@@ -320,51 +333,6 @@ export default function Dashboard() {
           <button onClick={fetchPortfolioData} className="refresh-btn">
             🔄 Refresh Data
           </button>
-
-          {/* Dropdown Add Entry Button */}
-          <div className="dropdown-wrapper">
-            <button className="refresh-btn">
-              + Add Entry ▼
-            </button>
-            <div className="dropdown-menu">
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  setSelectedCategory('mutualFund');
-                  setShowAddModal(true);
-                }}
-              >
-                📈 Mutual Fund
-              </button>
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  setSelectedCategory('metals');
-                  setShowAddModal(true);
-                }}
-              >
-                🪙 Metals
-              </button>
-              <button 
-                className="dropdown-item"
-                onClick={() => {
-                  setSelectedCategory('debt');
-                  setShowAddModal(true);
-                }}
-              >
-                💳 Debt
-              </button>
-              <button 
-                className="dropdown-item"
-                onClick={() => {
-                  setSelectedCategory('retirement');
-                  setShowAddModal(true);
-                }}
-              >
-                🏦 Retirement
-              </button>
-            </div>
-          </div>
         </div>
 
         <p className="last-updated">
@@ -372,12 +340,13 @@ export default function Dashboard() {
         </p>
       </footer>
 
-      {/* Add Entry Modal */}
-      <AddEntryModal 
-        isOpen={showAddModal}
-        category={selectedCategory}
-        onClose={() => setShowAddModal(false)}
-        onSubmit={handleAddEntry}
+      {/* Add/Edit Goal Modal */}
+      <AddEntryModal
+        isOpen={showGoalModal}
+        category="goal"
+        initialData={editingGoal}
+        onClose={() => { setShowGoalModal(false); setEditingGoal(null); }}
+        onSubmit={handleGoalSubmit}
       />
     </div>
   );

@@ -282,6 +282,33 @@ export const manualAPI = {
         method: 'DELETE'
       });
     }
+  },
+
+  // Wealth-building goals
+  goals: {
+    getAll: async () => {
+      return await apiCall('/manual/goals', { method: 'GET' });
+    },
+    create: async (data) => {
+      console.log('🎯 Creating goal...');
+      return await apiCall('/manual/goals', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    update: async (id, data) => {
+      console.log('🎯 Updating goal...');
+      return await apiCall(`/manual/goals/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+    },
+    delete: async (id) => {
+      console.log('🎯 Deleting goal...');
+      return await apiCall(`/manual/goals/${id}`, {
+        method: 'DELETE'
+      });
+    }
   }
 };
 

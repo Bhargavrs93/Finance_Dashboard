@@ -1,5 +1,6 @@
 const db = require('./database');
 const PriceService = require('./priceService');
+const { ANNUAL_EXPENSES, ANNUAL_EXPENSES_CURRENCY, FI_MULTIPLE } = require('./config/financialGoals');
 
 class PortfolioService {
   // Get all zerodha holdings
@@ -43,6 +44,11 @@ class PortfolioService {
       retirement: { value: 0, invested: 0, gainLoss: 0, percent: 0, count: 0 }
     };
 
+    // Liquid categories' INR-normalized value broken down by original
+    // currency, used for the geographic exposure chart (currency as a proxy
+    // for geography, since that's what's actually tracked per holding)
+    const byCurrency = { INR: 0, AUD: 0, USD: 0 };
+
     // Global, debt, and retirement entries can be denominated in AUD/USD.
     // Everything is normalized to INR here (using live rates) before being
     // summed, so the grand total isn't silently mixing currencies.
@@ -57,6 +63,11 @@ class PortfolioService {
         return amt; // INR, or no currency recorded (assume INR)
       };
 
+      const trackCurrency = (amount, currency) => {
+        const key = ['INR', 'AUD', 'USD'].includes(currency) ? currency : 'INR';
+        byCurrency[key] += toINR(amount, currency);
+      };
+
       let completed = 0;
       const total = 5; // Number of categories
 
@@ -68,10 +79,11 @@ class PortfolioService {
             summary.equity.invested += parseFloat(equity.cost_basis || 0);
             summary.equity.gainLoss += parseFloat(equity.gain_loss || 0);
             summary.equity.count++;
+            trackCurrency(equity.current_value, 'INR');
           });
         }
         completed++;
-        if (completed === total) calculateTotals();
+        if (completed === total) calculateTotals(audRate);
       });
 
       // Get metals with live gold price (always INR) - matches the Metal
@@ -83,10 +95,11 @@ class PortfolioService {
             summary.metals.invested += parseFloat(metal.cost_basis || 0);
             summary.metals.gainLoss += parseFloat(metal.gain_loss || 0);
             summary.metals.count++;
+            trackCurrency(metal.current_value, 'INR');
           });
         }
         completed++;
-        if (completed === total) calculateTotals();
+        if (completed === total) calculateTotals(audRate);
       });
 
       // Get global assets with live VDHG price (always AUD - normalize to
@@ -98,10 +111,11 @@ class PortfolioService {
             summary.global.invested += toINR(asset.cost_basis, asset.currency);
             summary.global.gainLoss += toINR(asset.gain_loss, asset.currency);
             summary.global.count++;
+            trackCurrency(asset.current_value, asset.currency);
           });
         }
         completed++;
-        if (completed === total) calculateTotals();
+        if (completed === total) calculateTotals(audRate);
       });
 
       // Get debt funds (currency varies per entry - normalize to INR)
@@ -112,14 +126,16 @@ class PortfolioService {
             summary.debt.value += investedINR;
             summary.debt.invested += investedINR;
             summary.debt.count++;
+            trackCurrency(debt.invested_amount, debt.currency);
           });
         }
         completed++;
-        if (completed === total) calculateTotals();
+        if (completed === total) calculateTotals(audRate);
       });
 
       // Get retirements with live prices where applicable (e.g. physical gold
-      // tracked as a retirement asset) - currency varies per entry, normalize to INR
+      // tracked as a retirement asset) - currency varies per entry, normalize to INR.
+      // Retirement is illiquid/locked, so it's excluded from byCurrency (liquid-only).
       PriceService.getRetirementsWithLivePrices((err, retirements) => {
         if (!err && retirements) {
           retirements.forEach(ret => {
@@ -130,14 +146,14 @@ class PortfolioService {
           });
         }
         completed++;
-        if (completed === total) calculateTotals();
+        if (completed === total) calculateTotals(audRate);
       });
     }).catch(err => {
       console.error('❌ Error fetching exchange rates for portfolio summary:', err.message);
       callback(err, null);
     });
 
-    const calculateTotals = () => {
+    const calculateTotals = (audRate) => {
       // Calculate total
       let totalValue = 0;
       let totalInvested = 0;
@@ -169,6 +185,36 @@ class PortfolioService {
         }
       });
 
+      // --- Financial Independence metrics ---
+      // Liquid = Equity + Metals + Global + Debt. Illiquid & locked = Retirement
+      // (which already includes any physical-gold entries tracked there).
+      const liquidValue = summary.equity.value + summary.metals.value + summary.global.value + summary.debt.value;
+      const liquidInvested = summary.equity.invested + summary.metals.invested + summary.global.invested + summary.debt.invested;
+      const liquidGainLoss = summary.equity.gainLoss + summary.metals.gainLoss + summary.global.gainLoss + summary.debt.gainLoss;
+      const illiquidLocked = summary.retirement.value;
+      const semiLiquid = 0; // no property tracked yet
+      const totalNetWorth = liquidValue + illiquidLocked + semiLiquid;
+
+      const fiTarget = FI_MULTIPLE * ANNUAL_EXPENSES * (ANNUAL_EXPENSES_CURRENCY === 'AUD' ? audRate : 1);
+      const fiProgress = fiTarget > 0 ? (liquidValue / fiTarget) * 100 : 0;
+      const returnPercent = liquidInvested > 0 ? (liquidGainLoss / liquidInvested) * 100 : 0;
+
+      const assetAllocation = ['equity', 'metals', 'global', 'debt']
+        .map(key => ({
+          category: key,
+          value: parseFloat(summary[key].value.toFixed(2)),
+          percent: liquidValue > 0 ? parseFloat(((summary[key].value / liquidValue) * 100).toFixed(2)) : 0
+        }))
+        .filter(item => item.value > 0);
+
+      const geographicExposure = Object.keys(byCurrency)
+        .map(cur => ({
+          currency: cur,
+          value: parseFloat(byCurrency[cur].toFixed(2)),
+          percent: liquidValue > 0 ? parseFloat(((byCurrency[cur] / liquidValue) * 100).toFixed(2)) : 0
+        }))
+        .filter(item => item.value > 0);
+
       console.log('✅ Portfolio summary calculated');
 
       callback(null, {
@@ -179,7 +225,18 @@ class PortfolioService {
           gainLossPercent: parseFloat(totalPercent.toFixed(2)),
           lastUpdated: new Date().toISOString()
         },
-        breakdown: summary
+        breakdown: summary,
+        fi: {
+          investableAssets: parseFloat(liquidValue.toFixed(2)),
+          fiTarget: parseFloat(fiTarget.toFixed(2)),
+          progress: parseFloat(fiProgress.toFixed(2)),
+          returnPercent: parseFloat(returnPercent.toFixed(2)),
+          illiquidLocked: parseFloat(illiquidLocked.toFixed(2)),
+          semiLiquid: parseFloat(semiLiquid.toFixed(2)),
+          totalNetWorth: parseFloat(totalNetWorth.toFixed(2)),
+          assetAllocation,
+          geographicExposure
+        }
       });
     };
   }

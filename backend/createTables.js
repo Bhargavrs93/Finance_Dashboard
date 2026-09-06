@@ -136,6 +136,18 @@ const createTablesSQL = [
     exchange_rate DECIMAL(6, 4),
     created_at TIMESTAMP,
     synced_at TIMESTAMP
+  )`,
+
+  // Table 9: goals
+  `CREATE TABLE IF NOT EXISTS goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(100) NOT NULL,
+    icon VARCHAR(10),
+    description VARCHAR(255),
+    progress_percent DECIMAL(5, 2) DEFAULT 0,
+    display_order INTEGER,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
   )`
 ];
 
@@ -151,7 +163,8 @@ createTablesSQL.forEach((sql, index) => {
     'debt_funds',
     'retirements',
     'price_history',
-    'portfolio_snapshots'
+    'portfolio_snapshots',
+    'goals'
   ];
 
   db.run(sql, (err) => {
@@ -163,7 +176,7 @@ createTablesSQL.forEach((sql, index) => {
 
       // All tables created
       if (completedCount === createTablesSQL.length) {
-        console.log('\n✅ All 8 tables created successfully!');
+        console.log(`\n✅ All ${createTablesSQL.length} tables created successfully!`);
         console.log('📊 Tables:');
         console.log('   1. users');
         console.log('   2. zerodha_holdings');
@@ -173,6 +186,7 @@ createTablesSQL.forEach((sql, index) => {
         console.log('   6. retirements');
         console.log('   7. price_history');
         console.log('   8. portfolio_snapshots');
+        console.log('   9. goals');
         console.log('\n✨ Database is ready!');
         db.close();
       }

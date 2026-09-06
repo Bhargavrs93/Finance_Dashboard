@@ -61,5 +61,20 @@ db.all('PRAGMA table_info(retirements)', [], (err, columns) => {
   }
 });
 
+// Migration: create 'goals' table if it doesn't exist yet
+// (manual wealth-building goals shown on the Dashboard)
+db.run(`CREATE TABLE IF NOT EXISTS goals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name VARCHAR(100) NOT NULL,
+  icon VARCHAR(10),
+  description VARCHAR(255),
+  progress_percent DECIMAL(5, 2) DEFAULT 0,
+  display_order INTEGER,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+)`, (err) => {
+  if (!err) console.log('✅ Verified goals table');
+});
+
 // Export database connection
 module.exports = db;

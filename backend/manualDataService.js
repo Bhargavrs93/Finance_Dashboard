@@ -441,6 +441,91 @@ class ManualDataService {
       }
     );
   }
+
+  // ============ GOALS ============
+
+  static getGoals(callback) {
+    db.all(
+      'SELECT * FROM goals ORDER BY display_order ASC, id ASC',
+      [],
+      (err, rows) => {
+        if (err) {
+          return callback(err, null);
+        }
+        callback(null, rows || []);
+      }
+    );
+  }
+
+  static createGoal(data, callback) {
+    console.log('📝 Creating goal...');
+
+    db.run(
+      `INSERT INTO goals (name, icon, description, progress_percent, display_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.name || '',
+        data.icon || '🎯',
+        data.description || '',
+        data.progress_percent || 0,
+        data.display_order || 0,
+        new Date().toISOString(),
+        new Date().toISOString()
+      ],
+      function(err) {
+        if (err) {
+          return callback(err, null);
+        }
+
+        console.log(`✅ Goal created with ID: ${this.lastID}`);
+        callback(null, { id: this.lastID, ...data });
+      }
+    );
+  }
+
+  static updateGoal(id, data, callback) {
+    console.log(`📝 Updating goal ID: ${id}`);
+
+    db.run(
+      `UPDATE goals
+       SET name = ?, icon = ?, description = ?, progress_percent = ?, display_order = ?, updated_at = ?
+       WHERE id = ?`,
+      [
+        data.name,
+        data.icon || '🎯',
+        data.description || '',
+        data.progress_percent || 0,
+        data.display_order || 0,
+        new Date().toISOString(),
+        id
+      ],
+      function(err) {
+        if (err) {
+          return callback(err, null);
+        }
+
+        console.log(`✅ Goal updated: ID ${id}`);
+        callback(null, { id, ...data });
+      }
+    );
+  }
+
+  static deleteGoal(id, callback) {
+    console.log(`🗑️  Deleting goal ID: ${id}`);
+
+    db.run(
+      'DELETE FROM goals WHERE id = ?',
+      [id],
+      function(err) {
+        if (err) {
+          return callback(err, null);
+        }
+
+        console.log(`✅ Goal deleted: ID ${id}`);
+        callback(null, { success: true, id });
+      }
+    );
+  }
 }
 
 module.exports = ManualDataService;

@@ -1,8 +1,13 @@
-﻿const express = require('express');
+﻿// Must run before any local module is required - several (e.g. financialGoals
+// config, loaded transitively via cronService -> portfolioService) read
+// process.env at require-time, so loading dotenv late means those modules
+// permanently cache the fallback default instead of the real .env value.
+require('dotenv').config();
+
+const express = require('express');
 const cors = require('cors');
 const PriceService = require('./priceService');
 const CronService = require('./cronService');
-require('dotenv').config();
 
 console.log('🔍 Starting server...');
 
@@ -757,6 +762,82 @@ app.delete('/api/manual/retirements/:id', verifyToken, (req, res) => {
     }
 
     console.log('✅ Retirement account deleted');
+    res.json({ success: true, data: result });
+  });
+});
+
+// -------- GOALS --------
+
+app.get('/api/manual/goals', verifyToken, (req, res) => {
+  console.log('📍 GET /api/manual/goals called');
+
+  ManualDataService.getGoals((err, goals) => {
+    if (err) {
+      console.error('❌ Error getting goals:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Error fetching goals',
+        error: err.message
+      });
+    }
+
+    console.log(`✅ Retrieved ${goals.length} goals`);
+    res.json({ success: true, data: goals });
+  });
+});
+
+app.post('/api/manual/goals', verifyToken, (req, res) => {
+  console.log('📍 POST /api/manual/goals called');
+
+  ManualDataService.createGoal(req.body, (err, goal) => {
+    if (err) {
+      console.error('❌ Error creating goal:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Error creating goal',
+        error: err.message
+      });
+    }
+
+    console.log('✅ Goal created');
+    res.status(201).json({ success: true, data: goal });
+  });
+});
+
+app.put('/api/manual/goals/:id', verifyToken, (req, res) => {
+  console.log('📍 PUT /api/manual/goals/:id called');
+  const { id } = req.params;
+
+  ManualDataService.updateGoal(id, req.body, (err, goal) => {
+    if (err) {
+      console.error('❌ Error updating goal:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Error updating goal',
+        error: err.message
+      });
+    }
+
+    console.log('✅ Goal updated');
+    res.json({ success: true, data: goal });
+  });
+});
+
+app.delete('/api/manual/goals/:id', verifyToken, (req, res) => {
+  console.log('📍 DELETE /api/manual/goals/:id called');
+  const { id } = req.params;
+
+  ManualDataService.deleteGoal(id, (err, result) => {
+    if (err) {
+      console.error('❌ Error deleting goal:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: 'Error deleting goal',
+        error: err.message
+      });
+    }
+
+    console.log('✅ Goal deleted');
     res.json({ success: true, data: result });
   });
 });
